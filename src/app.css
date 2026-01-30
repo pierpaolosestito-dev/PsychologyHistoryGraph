@@ -1,0 +1,36 @@
+/* Reset base */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+/* Fullscreen reale */
+html,
+body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+/* Root Vite */
+#app {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* Container grafo */
+.graph,
+.graph-container {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* Canvas di 3d-force-graph */
+canvas {
+  display: block;
+}
