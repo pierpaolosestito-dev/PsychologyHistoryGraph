@@ -14,9 +14,9 @@
   let data: any = null;
   let query = "";
 
-  let rootSelectedId: string | null = null;   // nodo cercato (contesto)
-  let selectedId: string | null = null;       // SEMPRE = rootSelectedId
-  let selectedNode: any = null;               // nodo in vista (root o neighbor)
+  let rootSelectedId: string | null = null;   // contesto corrente
+  let selectedId: string | null = null;       // sempre = rootSelectedId
+  let selectedNode: any = null;               // nodo in vista (root o preview)
 
   let neighborMap: Map<string, Set<string>> = new Map();
   let highlightedNeighbors = new Set<string>();
@@ -36,7 +36,7 @@
   const colorAccessor = (n: any) => {
     if (!selectedId) return colorFromString(n.id);
     if (n.id === selectedId) return "#facc15";                // root
-    if (highlightedNeighbors.has(n.id)) return "#7dd3fc";     // neighbor evidenziato
+    if (highlightedNeighbors.has(n.id)) return "#7dd3fc";     // preview
     if (neighborMap.get(selectedId)?.has(n.id)) return "#60a5fa";
     return "#334155";
   };
@@ -129,9 +129,20 @@
     selectedNode = { ...node, degree };
   }
 
-  // -------- Neighbor = vista TEMPORANEA --------
+  // -------- PREVIEW (checkbox) --------
   function viewNeighbor(id: string) {
     highlightedNeighbors = new Set([id]);
+    focusNode(id);
+    selectNode(id);
+    graph3D.nodeColor(colorAccessor);
+  }
+
+  // -------- COMMIT / EXPLORATION (freccia) --------
+  function commitNeighbor(id: string) {
+    rootSelectedId = id;
+    selectedId = id;
+    highlightedNeighbors = new Set();
+
     focusNode(id);
     selectNode(id);
     graph3D.nodeColor(colorAccessor);
@@ -305,8 +316,8 @@
     <strong>Neighbors:</strong>
     <ul>
       {#each Array.from(neighborMap.get(rootSelectedId ?? "") ?? []) as nid}
-        <li>
-          <label>
+        <li style="display:flex; align-items:center; gap:6px;">
+          <label style="flex:1; display:flex; align-items:center; gap:6px;">
             <input
               type="checkbox"
               checked={highlightedNeighbors.has(nid)}
@@ -318,6 +329,22 @@
             />
             {nid}
           </label>
+
+          <!-- EXPLORATION BUTTON -->
+          <button
+            title="Esplora questo nodo"
+            on:click={() => commitNeighbor(nid)}
+            style="
+              border:none;
+              background:rgba(255,255,255,0.08);
+              color:#e2e8f0;
+              cursor:pointer;
+              border-radius:4px;
+              padding:2px 6px;
+            "
+          >
+            →
+          </button>
         </li>
       {/each}
     </ul>
