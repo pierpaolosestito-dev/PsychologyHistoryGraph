@@ -14,8 +14,8 @@
   let data: any = null;
   let query = "";
 
-  let selectedId: string | null = null;
-  let rootSelectedId: string | null = null;
+  let selectedId: string | null = null;        // nodo attualmente in vista
+  let rootSelectedId: string | null = null;    // nodo principale cercato
   let selectedNode: any = null;
 
   let neighborMap: Map<string, Set<string>> = new Map();
@@ -129,12 +129,15 @@
     selectedNode = { ...node, degree };
   }
 
+  // 🔁 Neighbor = vista temporanea (NON cambia il root)
   function toggleNeighbor(id: string) {
     highlightedNeighbors.clear();
     highlightedNeighbors.add(id);
+
     selectedId = id;
     focusNode(id);
     selectNode(id);
+
     graph3D.nodeColor(colorAccessor);
   }
 
@@ -149,6 +152,8 @@
 
     rootSelectedId = node.id;
     selectedId = node.id;
+    highlightedNeighbors.clear();
+
     focusNode(node.id);
     selectNode(node.id);
     graph3D.nodeColor(colorAccessor);
@@ -221,6 +226,7 @@
     graph3D.onNodeClick((node: any) => {
       rootSelectedId = node.id;
       selectedId = node.id;
+      highlightedNeighbors.clear();
       focusNode(node.id);
       selectNode(node.id);
       graph3D.nodeColor(colorAccessor);
@@ -243,7 +249,7 @@
 <!-- TOOLBAR -->
 <div class="toolbar">
   <img
-    src="/icon.png"
+    src="icon.png"
     alt="Icon"
     style="width:28px; height:28px; margin-right:6px;"
   />
@@ -263,7 +269,7 @@
   </div>
 </div>
 
-<!-- FILTER CARD (LEFT, UNDER SEARCH) -->
+<!-- FILTER CARD -->
 <div class="filter-card">
   <strong>Visualizza:</strong>
 
@@ -300,6 +306,23 @@
   <div class="info-panel">
     <h3>{selectedNode.label}</h3>
     <p><strong>Degree:</strong> {selectedNode.degree}</p>
+
+    {#if rootSelectedId && selectedId !== rootSelectedId}
+      <button
+        class="back-btn"
+        on:click={() => {
+  highlightedNeighbors.clear();   // 👈 deseleziona TUTTI i checkbox
+  selectedId = rootSelectedId;
+
+  focusNode(rootSelectedId);
+  selectNode(rootSelectedId);
+  graph3D.nodeColor(colorAccessor);
+}}
+
+      >
+        Torna al nodo principale
+      </button>
+    {/if}
 
     <strong>Neighbors:</strong>
     <ul>
@@ -377,7 +400,6 @@
     cursor: pointer;
   }
 
-  /* --- NEW: filter card, styled to match existing UI --- */
   .filter-card {
     position: absolute;
     top: 64px;
