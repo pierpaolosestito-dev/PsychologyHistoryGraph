@@ -14,9 +14,9 @@
   let data: any = null;
   let query = "";
 
-  let selectedId: string | null = null;        // nodo attualmente in vista
-  let rootSelectedId: string | null = null;    // nodo principale cercato
-  let selectedNode: any = null;
+  let rootSelectedId: string | null = null;   // nodo cercato (contesto)
+  let selectedId: string | null = null;       // SEMPRE = rootSelectedId
+  let selectedNode: any = null;               // nodo in vista (root o neighbor)
 
   let neighborMap: Map<string, Set<string>> = new Map();
   let highlightedNeighbors = new Set<string>();
@@ -35,8 +35,8 @@
 
   const colorAccessor = (n: any) => {
     if (!selectedId) return colorFromString(n.id);
-    if (n.id === selectedId) return "#facc15";
-    if (highlightedNeighbors.has(n.id)) return "#7dd3fc";
+    if (n.id === selectedId) return "#facc15";                // root
+    if (highlightedNeighbors.has(n.id)) return "#7dd3fc";     // neighbor evidenziato
     if (neighborMap.get(selectedId)?.has(n.id)) return "#60a5fa";
     return "#334155";
   };
@@ -90,10 +90,10 @@
   function loadDataset(mode: DatasetMode) {
     datasetMode = mode;
 
-    selectedId = null;
     rootSelectedId = null;
+    selectedId = null;
     selectedNode = null;
-    highlightedNeighbors.clear();
+    highlightedNeighbors = new Set();
 
     data = buildGraphFromJson(DATASETS[mode]);
     buildNeighborMap();
@@ -129,15 +129,19 @@
     selectedNode = { ...node, degree };
   }
 
-  // 🔁 Neighbor = vista temporanea (NON cambia il root)
-  function toggleNeighbor(id: string) {
-    highlightedNeighbors.clear();
-    highlightedNeighbors.add(id);
-
-    selectedId = id;
+  // -------- Neighbor = vista TEMPORANEA --------
+  function viewNeighbor(id: string) {
+    highlightedNeighbors = new Set([id]);
     focusNode(id);
     selectNode(id);
+    graph3D.nodeColor(colorAccessor);
+  }
 
+  function backToRoot() {
+    if (!rootSelectedId) return;
+    highlightedNeighbors = new Set();
+    focusNode(rootSelectedId);
+    selectNode(rootSelectedId);
     graph3D.nodeColor(colorAccessor);
   }
 
@@ -152,7 +156,7 @@
 
     rootSelectedId = node.id;
     selectedId = node.id;
-    highlightedNeighbors.clear();
+    highlightedNeighbors = new Set();
 
     focusNode(node.id);
     selectNode(node.id);
@@ -160,10 +164,11 @@
   }
 
   function resetView() {
-    selectedId = null;
     rootSelectedId = null;
+    selectedId = null;
     selectedNode = null;
-    highlightedNeighbors.clear();
+    highlightedNeighbors = new Set();
+
     graph3D.nodeColor(colorAccessor);
     graph3D.cameraPosition(
       { x: 0, y: 0, z: 220 },
@@ -226,7 +231,7 @@
     graph3D.onNodeClick((node: any) => {
       rootSelectedId = node.id;
       selectedId = node.id;
-      highlightedNeighbors.clear();
+      highlightedNeighbors = new Set();
       focusNode(node.id);
       selectNode(node.id);
       graph3D.nodeColor(colorAccessor);
@@ -248,11 +253,7 @@
 
 <!-- TOOLBAR -->
 <div class="toolbar">
-  <img
-    src="icon.png"
-    alt="Icon"
-    style="width:28px; height:28px; margin-right:6px;"
-  />
+  <img src="icon.png" alt="Icon" style="width:28px; height:28px; margin-right:6px;" />
 
   <input
     type="text"
@@ -274,29 +275,17 @@
   <strong>Visualizza:</strong>
 
   <label>
-    <input
-      type="checkbox"
-      checked={datasetMode === "all"}
-      on:change={() => loadDataset("all")}
-    />
+    <input type="checkbox" checked={datasetMode === "all"} on:change={() => loadDataset("all")} />
     Personaggi + Luoghi
   </label>
 
   <label>
-    <input
-      type="checkbox"
-      checked={datasetMode === "personaggi"}
-      on:change={() => loadDataset("personaggi")}
-    />
+    <input type="checkbox" checked={datasetMode === "personaggi"} on:change={() => loadDataset("personaggi")} />
     Personaggi
   </label>
 
   <label>
-    <input
-      type="checkbox"
-      checked={datasetMode === "luoghi"}
-      on:change={() => loadDataset("luoghi")}
-    />
+    <input type="checkbox" checked={datasetMode === "luoghi"} on:change={() => loadDataset("luoghi")} />
     Luoghi
   </label>
 </div>
@@ -307,32 +296,25 @@
     <h3>{selectedNode.label}</h3>
     <p><strong>Degree:</strong> {selectedNode.degree}</p>
 
-    {#if rootSelectedId && selectedId !== rootSelectedId}
-      <button
-        class="back-btn"
-        on:click={() => {
-  highlightedNeighbors.clear();   // 👈 deseleziona TUTTI i checkbox
-  selectedId = rootSelectedId;
-
-  focusNode(rootSelectedId);
-  selectNode(rootSelectedId);
-  graph3D.nodeColor(colorAccessor);
-}}
-
-      >
+    {#if rootSelectedId && selectedNode.id !== rootSelectedId}
+      <button class="back-btn" on:click={backToRoot}>
         Torna al nodo principale
       </button>
     {/if}
 
     <strong>Neighbors:</strong>
     <ul>
-      {#each Array.from(neighborMap.get(selectedId) ?? []) as nid}
+      {#each Array.from(neighborMap.get(rootSelectedId ?? "") ?? []) as nid}
         <li>
           <label>
             <input
               type="checkbox"
               checked={highlightedNeighbors.has(nid)}
-              on:change={() => toggleNeighbor(nid)}
+              on:change={(e) => {
+                const checked = (e.currentTarget as HTMLInputElement).checked;
+                if (checked) viewNeighbor(nid);
+                else backToRoot();
+              }}
             />
             {nid}
           </label>
@@ -351,10 +333,7 @@
     color: #e2e8f0;
   }
 
-  .graph {
-    width: 100vw;
-    height: 100vh;
-  }
+  .graph { width: 100vw; height: 100vh; }
 
   .toolbar {
     position: absolute;
