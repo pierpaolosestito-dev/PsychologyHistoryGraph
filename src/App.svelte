@@ -23,6 +23,64 @@
 
   let datasetMode: DatasetMode = "all";
 
+  // ---------------- AUTOCOMPLETE (dataset-aware, JSON-based) ----------------
+  let searchIndex: { label: string; norm: string }[] = [];
+  let suggestions: string[] = [];
+  let showSuggestions = false;
+
+  function buildSearchIndex(json: Record<string, string[]>) {
+    const set = new Set<string>();
+
+    for (const [src, targets] of Object.entries(json)) {
+      set.add(src);
+      targets.forEach((t) => set.add(t));
+    }
+
+    searchIndex = Array.from(set).map((label) => ({
+      label,
+      norm: label.toLowerCase()
+    }));
+
+    // reset UI suggestions when dataset changes
+    suggestions = [];
+    showSuggestions = false;
+  }
+
+  function rankCandidates(q: string) {
+    const text = q.trim().toLowerCase();
+
+    // keep it simple: show suggestions only with at least 2 chars
+    if (text.length < 2) {
+      suggestions = [];
+      showSuggestions = false;
+      return;
+    }
+
+    const ranked = searchIndex
+      .map((item) => {
+        let score = 0;
+
+        if (item.norm.startsWith(text)) score += 3;
+        else if (item.norm.includes(` ${text}`)) score += 2;
+        else if (item.norm.includes(text)) score += 1;
+
+        return { label: item.label, score };
+      })
+      .filter((r) => r.score > 0)
+      .sort((a, b) => b.score - a.score || a.label.length - b.label.length)
+      .slice(0, 7)
+      .map((r) => r.label);
+
+    suggestions = ranked;
+    showSuggestions = ranked.length > 0;
+  }
+
+  function chooseSuggestion(label: string) {
+    query = label;
+    showSuggestions = false;
+    searchNode(label);
+  }
+
   // ---------------- COLOR UTILS ----------------
   function colorFromString(str: string) {
     let hash = 0;
@@ -97,6 +155,9 @@
 
     data = buildGraphFromJson(DATASETS[mode]);
     buildNeighborMap();
+
+    // build dataset-aware search index from JSON source
+    buildSearchIndex(DATASETS[mode]);
 
     graph3D.graphData(data);
     graph3D.nodeColor(colorAccessor);
@@ -180,6 +241,10 @@
     selectedNode = null;
     highlightedNeighbors = new Set();
 
+    // autocomplete UI reset
+    suggestions = [];
+    showSuggestions = false;
+
     graph3D.nodeColor(colorAccessor);
     graph3D.cameraPosition(
       { x: 0, y: 0, z: 220 },
@@ -243,6 +308,10 @@
       rootSelectedId = node.id;
       selectedId = node.id;
       highlightedNeighbors = new Set();
+
+      // close suggestions on graph interaction (keeps UX clean)
+      showSuggestions = false;
+
       focusNode(node.id);
       selectNode(node.id);
       graph3D.nodeColor(colorAccessor);
@@ -266,13 +335,50 @@
 <div class="toolbar">
   <img src="icon.png" alt="Icon" style="width:28px; height:28px; margin-right:6px;" />
 
-  <input
-    type="text"
-    placeholder="Search node..."
-    bind:value={query}
-    on:keydown={(e) => e.key === "Enter" && searchNode(query)}
-  />
-  <button on:click={() => searchNode(query)}>Search</button>
+  <div class="search-wrap">
+    <input
+      type="text"
+      placeholder="Search node..."
+      bind:value={query}
+      on:input={() => rankCandidates(query)}
+      on:keydown={(e) => {
+        if (e.key === "Enter") {
+          showSuggestions = false;
+          searchNode(query);
+        }
+        if (e.key === "Escape") {
+          showSuggestions = false;
+        }
+      }}
+      on:focus={() => {
+        // show suggestions again if there are any and query is long enough
+        if (suggestions.length > 0 && query.trim().length >= 2) showSuggestions = true;
+      }}
+      on:blur={() => {
+        // allow click on suggestions: delay close a tick
+        setTimeout(() => (showSuggestions = false), 120);
+      }}
+    />
+
+    {#if showSuggestions}
+      <div class="autocomplete">
+        {#each suggestions as s}
+          <div class="autocomplete-item" on:click={() => chooseSuggestion(s)}>
+            {s}
+          </div>
+        {/each}
+      </div>
+    {/if}
+  </div>
+
+  <button
+    on:click={() => {
+      showSuggestions = false;
+      searchNode(query);
+    }}
+  >
+    Search
+  </button>
   <button on:click={resetView}>Reset</button>
 
   <div class="zoom-inline">
@@ -362,17 +468,56 @@
 
   .graph { width: 100vw; height: 100vh; }
 
-  .toolbar {
-    position: absolute;
-    top: 10px;
-    left: 10px;
+ .toolbar {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  background: rgba(15, 23, 42, 0.85);
+  padding: 8px 10px;
+  border-radius: 8px;
+  z-index: 30; /* <-- prima era 10 */
+}
+
+
+  .search-wrap {
+    position: relative;
     display: flex;
-    gap: 8px;
     align-items: center;
-    background: rgba(15, 23, 42, 0.85);
-    padding: 8px 10px;
+  }
+
+  .autocomplete {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    width: 320px;
+    max-width: 56vw;
+    background: rgba(15, 23, 42, 0.95);
     border-radius: 8px;
-    z-index: 10;
+    overflow: hidden;
+    z-index: 20;
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
+  }
+
+  .autocomplete-item {
+    padding: 6px 10px;
+    cursor: pointer;
+    font-size: 13px;
+    line-height: 1.2;
+    border-top: 1px solid rgba(148, 163, 184, 0.08);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .autocomplete-item:first-child {
+    border-top: none;
+  }
+
+  .autocomplete-item:hover {
+    background: rgba(56, 189, 248, 0.2);
   }
 
   .zoom-inline {
