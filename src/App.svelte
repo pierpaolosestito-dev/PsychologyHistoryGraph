@@ -8,9 +8,13 @@
   import { DATASETS, type DatasetMode } from "./data/datasets";
   import InfoPanel from "./components/InfoPanel.svelte";
   import HistoryPanel from "./components/HistoryPanel.svelte";
+  import Graph2D from "./components/Graph2D.svelte";
 
   let container: HTMLDivElement;
   let graph3D: any;
+
+  // ---------------- VIEW MODE ----------------
+  let viewMode: "3d" | "2d" = "3d";
 
   // ---------------- STATE ----------------
   let data: any = null;
@@ -27,6 +31,8 @@
 
   // ---------------- HISTORY ----------------
   let history: string[] = [];
+
+  
 
   function startHistory(id: string) {
     history = [id];
@@ -193,6 +199,7 @@
   }
 
   function refreshNodeVisuals() {
+    if (!graph3D) return;
     graph3D.nodeThreeObject((node: any) => makeNodeObject(node));
   }
 
@@ -245,13 +252,16 @@
     buildNeighborMap();
     buildSearchIndex(DATASETS[mode]);
 
-    graph3D.graphData(data);
-    refreshNodeVisuals();
-    graph3D.cameraPosition({ x: 0, y: 0, z: 220 }, { x: 0, y: 0, z: 0 }, 800);
+    if (graph3D) {
+      graph3D.graphData(data);
+      refreshNodeVisuals();
+      graph3D.cameraPosition({ x: 0, y: 0, z: 220 }, { x: 0, y: 0, z: 0 }, 800);
+    }
   }
 
   // ---------------- INTERACTIONS ----------------
   function focusNode(id: string) {
+    if (!graph3D) return;
     const node = data.nodes.find((n: any) => n.id === id);
     if (!node || node.x == null) return;
     graph3D.cameraPosition(
@@ -265,6 +275,18 @@
     const node = data.nodes.find((n: any) => n.id === id);
     const degree = data.links.filter((l: any) => l.source === id || l.target === id).length;
     selectedNode = { ...node, degree };
+  }
+
+  // click unificato (3D e 2D)
+  function handleNodeClick(id: string) {
+    rootSelectedId = id;
+    selectedId = id;
+    highlightedNeighbors = new Set();
+    showSuggestions = false;
+    startHistory(id);
+    focusNode(id);
+    selectNode(id);
+    refreshNodeVisuals();
   }
 
   function viewNeighbor(id: string) {
@@ -316,10 +338,13 @@
     showSuggestions = false;
     clearHistory();
     refreshNodeVisuals();
-    graph3D.cameraPosition({ x: 0, y: 0, z: 220 }, { x: 0, y: 0, z: 0 }, 800);
+    if (graph3D) {
+      graph3D.cameraPosition({ x: 0, y: 0, z: 220 }, { x: 0, y: 0, z: 0 }, 800);
+    }
   }
 
   function zoomIn() {
+    if (!graph3D) return;
     const cam = graph3D.camera();
     graph3D.cameraPosition(
       { x: cam.position.x, y: cam.position.y, z: cam.position.length() * 0.75 },
@@ -329,6 +354,7 @@
   }
 
   function zoomOut() {
+    if (!graph3D) return;
     const cam = graph3D.camera();
     graph3D.cameraPosition(
       { x: cam.position.x, y: cam.position.y, z: cam.position.length() * 1.3 },
@@ -351,14 +377,7 @@
     graph3D.nodeThreeObject((node: any) => makeNodeObject(node));
 
     graph3D.onNodeClick((node: any) => {
-      rootSelectedId = node.id;
-      selectedId = node.id;
-      highlightedNeighbors = new Set();
-      showSuggestions = false;
-      startHistory(node.id);
-      focusNode(node.id);
-      selectNode(node.id);
-      refreshNodeVisuals();
+      handleNodeClick(node.id);
     });
 
     graph3D
@@ -373,11 +392,25 @@
   onDestroy(() => graph3D?._destructor?.());
 </script>
 
-<div bind:this={container} class="graph"></div>
+{#if viewMode === "3d"}
+  <div bind:this={container} class="graph"></div>
+{:else}
+  <Graph2D
+    {data}
+    {selectedId}
+    {highlightedNeighbors}
+    {neighborMap}
+    onNodeClick={handleNodeClick}
+  />
+{/if}
 
 <!-- TOOLBAR -->
 <div class="toolbar">
   <img src="icon.png" alt="Icon" style="width:28px; height:28px; margin-right:6px;" />
+
+  <!-- Toggle 3D/2D (aggiunta minima) -->
+  <button on:click={() => (viewMode = "3d")}>3D</button>
+  <button on:click={() => (viewMode = "2d")}>2D</button>
 
   <div class="search-wrap">
     <input
@@ -444,7 +477,6 @@
     refreshNodeVisuals();
   }}
 />
-
 
 <style>
   :global(body) {
