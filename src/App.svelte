@@ -6,6 +6,7 @@
   import { forceManyBody, forceCenter, forceLink } from "d3-force-3d";
 
   import { DATASETS, type DatasetMode } from "./data/datasets";
+  import InfoPanel from "./components/InfoPanel.svelte";
 
   let container: HTMLDivElement;
   let graph3D: any;
@@ -14,9 +15,9 @@
   let data: any = null;
   let query = "";
 
-  let rootSelectedId: string | null = null;   // contesto corrente
-  let selectedId: string | null = null;       // sempre = rootSelectedId
-  let selectedNode: any = null;               // nodo in vista (root o preview)
+  let rootSelectedId: string | null = null; // contesto corrente
+  let selectedId: string | null = null; // sempre = rootSelectedId
+  let selectedNode: any = null; // nodo in vista (root o preview)
 
   let neighborMap: Map<string, Set<string>> = new Map();
   let highlightedNeighbors = new Set<string>();
@@ -38,7 +39,7 @@
 
     searchIndex = Array.from(set).map((label) => ({
       label,
-      norm: label.toLowerCase()
+      norm: label.toLowerCase(),
     }));
 
     // reset UI suggestions when dataset changes
@@ -93,11 +94,108 @@
 
   const colorAccessor = (n: any) => {
     if (!selectedId) return colorFromString(n.id);
-    if (n.id === selectedId) return "#facc15";                // root
-    if (highlightedNeighbors.has(n.id)) return "#7dd3fc";     // preview
+    if (n.id === selectedId) return "#facc15"; // root
+    if (highlightedNeighbors.has(n.id)) return "#7dd3fc"; // preview
     if (neighborMap.get(selectedId)?.has(n.id)) return "#60a5fa";
     return "#334155";
   };
+
+  // Opacity: chi non c'entra nulla deve essere più trasparente
+  function opacityForNode(nodeId: string) {
+    if (!selectedId) return 1;
+    if (nodeId === selectedId) return 1; // root
+    if (highlightedNeighbors.has(nodeId)) return 1; // preview
+    if (neighborMap.get(selectedId)?.has(nodeId)) return 0.95; // neighbor
+    return 0.22; // others (dim)
+  }
+
+  // ---------------- ICON + RING (cached) ----------------
+  const textureLoader = new THREE.TextureLoader();
+  const iconTexture = textureLoader.load("icon.png");
+  iconTexture.colorSpace = THREE.SRGBColorSpace;
+
+  const ringGeometry = new THREE.RingGeometry(0.65, 0.85, 32);
+
+  function makeIconSprite(size = 14, opacity = 1) {
+    const material = new THREE.SpriteMaterial({
+      map: iconTexture,
+      transparent: true,
+      depthWrite: false,
+      opacity,
+    });
+
+    const sprite = new THREE.Sprite(material);
+    sprite.scale.set(size, size, 1);
+    return sprite;
+  }
+
+  function makeRing(color: string, opacity = 1) {
+    const material = new THREE.MeshBasicMaterial({
+      color,
+      transparent: true,
+      opacity: Math.min(0.95, opacity),
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    });
+
+    const ring = new THREE.Mesh(ringGeometry, material);
+    ring.rotation.x = Math.PI / 2;
+    ring.scale.set(8, 8, 8);
+    return ring;
+  }
+
+  function makeLabel(text: string, opacity = 1) {
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d")!;
+    ctx.font = "26px sans-serif";
+    const width = ctx.measureText(text).width + 20;
+    canvas.width = width;
+    canvas.height = 36;
+    ctx.font = "26px sans-serif";
+    ctx.fillStyle = "white";
+    ctx.fillText(text, 10, 26);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+
+    const material = new THREE.SpriteMaterial({
+      map: texture,
+      transparent: true,
+      depthWrite: false,
+      opacity,
+    });
+
+    const sprite = new THREE.Sprite(material);
+    sprite.scale.set(18, 8, 1);
+    return sprite;
+  }
+
+  function makeNodeObject(node: any) {
+    const group = new THREE.Group();
+
+    const ringColor = colorAccessor(node);
+    const o = opacityForNode(node.id);
+
+    // icon
+    const icon = makeIconSprite(14, o);
+    group.add(icon);
+
+    // ring
+    const ring = makeRing(ringColor, o);
+    group.add(ring);
+
+    // label (dimmed when unrelated)
+    const label = makeLabel(node.label, Math.max(0.18, o));
+    label.position.y = -10;
+    group.add(label);
+
+    return group;
+  }
+
+  function refreshNodeVisuals() {
+    // ricrea gli oggetti 3D usando lo stato corrente (selectedId, highlightedNeighbors, neighborMap)
+    graph3D.nodeThreeObject((node: any) => makeNodeObject(node));
+  }
 
   // ---------------- GRAPH BUILD ----------------
   function buildGraphFromJson(json: Record<string, string[]>) {
@@ -107,7 +205,7 @@
     Object.entries(json).forEach(([src, targets]) => {
       if (!graph.hasNode(src)) graph.addNode(src, { label: src });
 
-      targets.forEach(dst => {
+      targets.forEach((dst) => {
         if (!graph.hasNode(dst)) graph.addNode(dst, { label: dst });
 
         const key = [src, dst].sort().join("||");
@@ -121,13 +219,8 @@
     const nodes: any[] = [];
     const links: any[] = [];
 
-    graph.forEachNode((id, attrs) =>
-      nodes.push({ id, label: attrs.label })
-    );
-
-    graph.forEachEdge((_, __, s, t) =>
-      links.push({ source: s, target: t })
-    );
+    graph.forEachNode((id, attrs) => nodes.push({ id, label: attrs.label }));
+    graph.forEachEdge((_, __, s, t) => links.push({ source: s, target: t }));
 
     return { nodes, links };
   }
@@ -160,13 +253,9 @@
     buildSearchIndex(DATASETS[mode]);
 
     graph3D.graphData(data);
-    graph3D.nodeColor(colorAccessor);
+    refreshNodeVisuals();
 
-    graph3D.cameraPosition(
-      { x: 0, y: 0, z: 220 },
-      { x: 0, y: 0, z: 0 },
-      800
-    );
+    graph3D.cameraPosition({ x: 0, y: 0, z: 220 }, { x: 0, y: 0, z: 0 }, 800);
   }
 
   // ---------------- INTERACTIONS ----------------
@@ -183,10 +272,7 @@
 
   function selectNode(id: string) {
     const node = data.nodes.find((n: any) => n.id === id);
-    const degree = data.links.filter(
-      (l: any) => l.source === id || l.target === id
-    ).length;
-
+    const degree = data.links.filter((l: any) => l.source === id || l.target === id).length;
     selectedNode = { ...node, degree };
   }
 
@@ -195,7 +281,7 @@
     highlightedNeighbors = new Set([id]);
     focusNode(id);
     selectNode(id);
-    graph3D.nodeColor(colorAccessor);
+    refreshNodeVisuals();
   }
 
   // -------- COMMIT / EXPLORATION (freccia) --------
@@ -206,7 +292,7 @@
 
     focusNode(id);
     selectNode(id);
-    graph3D.nodeColor(colorAccessor);
+    refreshNodeVisuals();
   }
 
   function backToRoot() {
@@ -214,16 +300,14 @@
     highlightedNeighbors = new Set();
     focusNode(rootSelectedId);
     selectNode(rootSelectedId);
-    graph3D.nodeColor(colorAccessor);
+    refreshNodeVisuals();
   }
 
   function searchNode(q: string) {
     const text = q.trim().toLowerCase();
     if (!text) return;
 
-    const node = data.nodes.find((n: any) =>
-      n.label.toLowerCase().includes(text)
-    );
+    const node = data.nodes.find((n: any) => n.label.toLowerCase().includes(text));
     if (!node) return;
 
     rootSelectedId = node.id;
@@ -232,7 +316,7 @@
 
     focusNode(node.id);
     selectNode(node.id);
-    graph3D.nodeColor(colorAccessor);
+    refreshNodeVisuals();
   }
 
   function resetView() {
@@ -245,50 +329,20 @@
     suggestions = [];
     showSuggestions = false;
 
-    graph3D.nodeColor(colorAccessor);
-    graph3D.cameraPosition(
-      { x: 0, y: 0, z: 220 },
-      { x: 0, y: 0, z: 0 },
-      800
-    );
+    refreshNodeVisuals();
+    graph3D.cameraPosition({ x: 0, y: 0, z: 220 }, { x: 0, y: 0, z: 0 }, 800);
   }
 
   function zoomIn() {
     const cam = graph3D.camera();
     const dist = cam.position.length();
-    graph3D.cameraPosition(
-      { x: cam.position.x, y: cam.position.y, z: dist * 0.75 },
-      undefined,
-      300
-    );
+    graph3D.cameraPosition({ x: cam.position.x, y: cam.position.y, z: dist * 0.75 }, undefined, 300);
   }
 
   function zoomOut() {
     const cam = graph3D.camera();
     const dist = cam.position.length();
-    graph3D.cameraPosition(
-      { x: cam.position.x, y: cam.position.y, z: dist * 1.3 },
-      undefined,
-      300
-    );
-  }
-
-  function makeLabel(text: string) {
-    const canvas = document.createElement("canvas");
-    const ctx = canvas.getContext("2d")!;
-    ctx.font = "26px sans-serif";
-    const width = ctx.measureText(text).width + 20;
-    canvas.width = width;
-    canvas.height = 36;
-    ctx.font = "26px sans-serif";
-    ctx.fillStyle = "white";
-    ctx.fillText(text, 10, 26);
-
-    const texture = new THREE.CanvasTexture(canvas);
-    const material = new THREE.SpriteMaterial({ map: texture, transparent: true });
-    const sprite = new THREE.Sprite(material);
-    sprite.scale.set(18, 8, 1);
-    return sprite;
+    graph3D.cameraPosition({ x: cam.position.x, y: cam.position.y, z: dist * 1.3 }, undefined, 300);
   }
 
   // ---------------- LIFECYCLE ----------------
@@ -301,8 +355,9 @@
       .linkOpacity(0.4)
       .linkWidth(0.4);
 
-    graph3D.nodeThreeObjectExtend(true);
-    graph3D.nodeThreeObject((node: any) => makeLabel(node.label));
+    // sostituiamo la sfera standard con il nostro oggetto (icone + ring + label)
+    graph3D.nodeThreeObjectExtend(false);
+    graph3D.nodeThreeObject((node: any) => makeNodeObject(node));
 
     graph3D.onNodeClick((node: any) => {
       rootSelectedId = node.id;
@@ -314,10 +369,11 @@
 
       focusNode(node.id);
       selectNode(node.id);
-      graph3D.nodeColor(colorAccessor);
+      refreshNodeVisuals();
     });
 
-    graph3D.forceEngine("d3")
+    graph3D
+      .forceEngine("d3")
       .d3Force("charge", forceManyBody().strength(-60))
       .d3Force("center", forceCenter())
       .d3Force("link", forceLink().distance(70).strength(0.5));
@@ -407,55 +463,16 @@
   </label>
 </div>
 
-<!-- INFO PANEL -->
-{#if selectedNode}
-  <div class="info-panel">
-    <h3>{selectedNode.label}</h3>
-    <p><strong>Degree:</strong> {selectedNode.degree}</p>
-
-    {#if rootSelectedId && selectedNode.id !== rootSelectedId}
-      <button class="back-btn" on:click={backToRoot}>
-        Torna al nodo principale
-      </button>
-    {/if}
-
-    <strong>Neighbors:</strong>
-    <ul>
-      {#each Array.from(neighborMap.get(rootSelectedId ?? "") ?? []) as nid}
-        <li style="display:flex; align-items:center; gap:6px;">
-          <label style="flex:1; display:flex; align-items:center; gap:6px;">
-            <input
-              type="checkbox"
-              checked={highlightedNeighbors.has(nid)}
-              on:change={(e) => {
-                const checked = (e.currentTarget as HTMLInputElement).checked;
-                if (checked) viewNeighbor(nid);
-                else backToRoot();
-              }}
-            />
-            {nid}
-          </label>
-
-          <!-- EXPLORATION BUTTON -->
-          <button
-            title="Esplora questo nodo"
-            on:click={() => commitNeighbor(nid)}
-            style="
-              border:none;
-              background:rgba(255,255,255,0.08);
-              color:#e2e8f0;
-              cursor:pointer;
-              border-radius:4px;
-              padding:2px 6px;
-            "
-          >
-            →
-          </button>
-        </li>
-      {/each}
-    </ul>
-  </div>
-{/if}
+<!-- INFO PANEL (refactor in componente) -->
+<InfoPanel
+  {selectedNode}
+  {rootSelectedId}
+  neighborIds={Array.from(neighborMap.get(rootSelectedId ?? "") ?? [])}
+  {highlightedNeighbors}
+  onBackToRoot={backToRoot}
+  onViewNeighbor={viewNeighbor}
+  onCommitNeighbor={commitNeighbor}
+/>
 
 <style>
   :global(body) {
@@ -466,21 +483,23 @@
     color: #e2e8f0;
   }
 
-  .graph { width: 100vw; height: 100vh; }
+  .graph {
+    width: 100vw;
+    height: 100vh;
+  }
 
- .toolbar {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  background: rgba(15, 23, 42, 0.85);
-  padding: 8px 10px;
-  border-radius: 8px;
-  z-index: 30; /* <-- prima era 10 */
-}
-
+  .toolbar {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    background: rgba(15, 23, 42, 0.85);
+    padding: 8px 10px;
+    border-radius: 8px;
+    z-index: 30; /* <-- prima era 10 */
+  }
 
   .search-wrap {
     position: relative;
@@ -525,30 +544,6 @@
     flex-direction: column;
     gap: 4px;
     margin-left: 6px;
-  }
-
-  .info-panel {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    width: 260px;
-    max-height: 340px;
-    overflow-y: auto;
-    background: rgba(15, 23, 42, 0.85);
-    padding: 12px;
-    border-radius: 8px;
-    z-index: 10;
-  }
-
-  .back-btn {
-    width: 100%;
-    margin: 6px 0 10px;
-    padding: 6px;
-    border: none;
-    border-radius: 4px;
-    background: rgba(56, 189, 248, 0.2);
-    color: #e2e8f0;
-    cursor: pointer;
   }
 
   .filter-card {
