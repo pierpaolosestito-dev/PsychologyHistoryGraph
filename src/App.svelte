@@ -435,7 +435,7 @@
   {history}
   onClear={clearHistory}
   onJumpTo={(id) => {
-    truncateHistoryTo(id);
+    // SOLO navigazione, NON alteriamo la history
     rootSelectedId = id;
     selectedId = id;
     highlightedNeighbors = new Set();
@@ -444,6 +444,7 @@
     refreshNodeVisuals();
   }}
 />
+
 
 <style>
   :global(body) {
