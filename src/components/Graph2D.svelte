@@ -13,6 +13,10 @@
   let container: HTMLDivElement;
   let graph: any;
 
+  // --------- ICON ---------
+  const iconImg = new Image();
+  iconImg.src = "icon.png";
+
   // --------- COLOR / OPACITY (stessa semantica del 3D) ---------
   function colorFromString(str: string) {
     let hash = 0;
@@ -39,33 +43,34 @@
   }
 
   // --------- CUSTOM NODE DRAW ---------
-  function drawNode(node: any, ctx: CanvasRenderingContext2D, globalScale: number) {
-    const radius = 6;
+  function drawNode(
+    node: any,
+    ctx: CanvasRenderingContext2D,
+    globalScale: number
+  ) {
+    const size = 14;
     const opacity = nodeOpacity(node.id);
 
     ctx.save();
     ctx.globalAlpha = opacity;
 
-    // cerchio
-    ctx.beginPath();
-    ctx.arc(node.x, node.y, radius, 0, 2 * Math.PI);
-    ctx.fillStyle = nodeColor(node);
-    ctx.fill();
-
-    // bordo
-    ctx.lineWidth = 1;
-    ctx.strokeStyle = "rgba(0,0,0,0.4)";
-    ctx.stroke();
-
-    // label (solo se abbastanza zoommati)
-    if (globalScale > 1.4) {
-      ctx.globalAlpha = Math.max(0.18, opacity);
-      ctx.font = `${12 / globalScale}px sans-serif`;
-      ctx.fillStyle = "#ffffff";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "top";
-      ctx.fillText(node.label, node.x, node.y + radius + 2);
+    // icona (centrata)
+    if (iconImg.complete) {
+      ctx.drawImage(
+        iconImg,
+        node.x - size / 2,
+        node.y - size / 2,
+        size,
+        size
+      );
     }
+
+    // ring (come nel 3D)
+    ctx.beginPath();
+    ctx.arc(node.x, node.y, size * 0.65, 0, 2 * Math.PI);
+    ctx.strokeStyle = nodeColor(node);
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
 
     ctx.restore();
   }
@@ -81,12 +86,15 @@
       .graphData(data)
       .backgroundColor("#050816")
       .nodeCanvasObject(drawNode)
-      .nodePointerAreaPaint((node: any, color: string, ctx: CanvasRenderingContext2D) => {
-        ctx.fillStyle = color;
-        ctx.beginPath();
-        ctx.arc(node.x, node.y, 8, 0, 2 * Math.PI);
-        ctx.fill();
-      })
+      .nodeLabel((node: any) => node.label) // hover tooltip
+      .nodePointerAreaPaint(
+        (node: any, color: string, ctx: CanvasRenderingContext2D) => {
+          ctx.fillStyle = color;
+          ctx.beginPath();
+          ctx.arc(node.x, node.y, 10, 0, 2 * Math.PI);
+          ctx.fill();
+        }
+      )
       .linkColor(() => "rgba(148,163,184,0.25)")
       .linkWidth(0.6)
       .onNodeClick((node: any) => {
