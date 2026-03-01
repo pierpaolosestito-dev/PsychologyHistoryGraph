@@ -5,7 +5,12 @@
   import * as THREE from "three";
   import { forceManyBody, forceCenter, forceLink } from "d3-force-3d";
 
-  import { DATASETS, type DatasetMode } from "./data/datasets";
+  import {
+  DATASETS,
+  type DatasetMode,
+  getAspFactsLp,
+  getAspGraph
+} from "./data/datasets";
   import InfoPanel from "./components/InfoPanel.svelte";
   import HistoryPanel from "./components/HistoryPanel.svelte";
 
@@ -22,7 +27,7 @@
 
   let neighborMap: Map<string, Set<string>> = new Map();
   let highlightedNeighbors = new Set<string>();
-
+  let cliqueNodes = new Set<string>();
   let datasetMode: DatasetMode = "all";
 
   // ---------------- HISTORY ----------------
@@ -106,6 +111,7 @@
   }
 
   const colorAccessor = (n: any) => {
+    if (cliqueNodes.has(n.id)) return "#7dd3fc";
     if (!selectedId) return colorFromString(n.id);
     if (n.id === selectedId) return "#facc15";
     if (highlightedNeighbors.has(n.id)) return "#7dd3fc";
@@ -114,6 +120,7 @@
   };
 
   function opacityForNode(nodeId: string) {
+    if (cliqueNodes.has(nodeId)) return 1;
     if (!selectedId) return 1;
     if (nodeId === selectedId) return 1;
     if (highlightedNeighbors.has(nodeId)) return 1;
@@ -239,6 +246,7 @@
     selectedId = null;
     selectedNode = null;
     highlightedNeighbors = new Set();
+    cliqueNodes = new Set();
     clearHistory();
 
     data = buildGraphFromJson(DATASETS[mode]);
@@ -312,12 +320,18 @@
     selectedId = null;
     selectedNode = null;
     highlightedNeighbors = new Set();
+    cliqueNodes = new Set();
     suggestions = [];
     showSuggestions = false;
     clearHistory();
     refreshNodeVisuals();
     graph3D.cameraPosition({ x: 0, y: 0, z: 220 }, { x: 0, y: 0, z: 0 }, 800);
   }
+
+  function clearClique() {
+  cliqueNodes = new Set();
+  refreshNodeVisuals();
+}
 
   function zoomIn() {
     const cam = graph3D.camera();
@@ -337,8 +351,102 @@
     );
   }
 
+  const ASP_PROGRAM = `
+{ in(V) : node(V) }.
+
+:- in(U), in(V), U < V, not edge(U,V).
+
+#maximize { 1,V : in(V) }.
+
+#show in/1.`;
+async function runMaximumClique() {
+  console.log("🔵 [CLIQUE] Starting computation...");
+  console.time("CLIQUE_TIME");
+
+  const facts = getAspFactsLp(datasetMode);
+  const fullProgram = facts.trim() + "\n\n" + ASP_PROGRAM.trim() + "\n";
+
+  return new Promise<void>((resolve) => {
+
+    const handler = (e: MessageEvent) => {
+      console.log("🟢 [CLIQUE] Worker message:", e.data);
+
+
+      if (e.data?.Result === "ERROR") {
+        console.error("❌ CLINGO ERROR:", e.data.Error);
+        console.timeEnd("CLIQUE_TIME");
+        clingoWorker.removeEventListener("message", handler);
+        resolve();
+        return;
+      }
+
+      if (!e.data?.Call?.[0]?.Witnesses) return;
+
+      const witnesses = e.data.Call[0].Witnesses;
+
+      if (!witnesses.length) {
+        console.warn("⚠️ No models found");
+        console.timeEnd("CLIQUE_TIME");
+        clingoWorker.removeEventListener("message", handler);
+        resolve();
+        return;
+      }
+
+      const witness = witnesses[witnesses.length - 1];
+
+      const inAtoms = witness.Value.filter((v: string) =>
+        v.startsWith("in(")
+      );
+
+      const ids = inAtoms
+        .map((atom: string) => {
+          const match = atom.match(/in\((\d+)\)/);
+          return match ? parseInt(match[1]) : null;
+        })
+        .filter(Boolean) as number[];
+
+      const aspGraph = getAspGraph(datasetMode);
+
+      const names = ids
+        .map((id) => aspGraph.index[id]?.name)
+        .filter(Boolean);
+
+      cliqueNodes = new Set(names);
+      refreshNodeVisuals();
+
+      console.log("🟢 Clique size:", names.length);
+console.log("🟢 Clique nodes:", names);
+      console.timeEnd("CLIQUE_TIME");
+
+      clingoWorker.removeEventListener("message", handler);
+      resolve();
+    };
+
+    clingoWorker.addEventListener("message", handler);
+
+   clingoWorker.postMessage({
+  type: "run",
+  args: [
+    fullProgram,
+    0,
+    []
+  ]
+});
+  });
+}  
+let clingoWorker:Worker;
   // ---------------- LIFECYCLE ----------------
   onMount(() => {
+    clingoWorker = new Worker(
+  new URL("./clingo/clingo.web.worker.js", import.meta.url),
+  { type: "module" }
+);
+
+clingoWorker.postMessage({
+  type: "init",
+  wasmUrl: new URL("./clingo/clingo.wasm", import.meta.url).toString()
+});
+
     graph3D = ForceGraph3D()(container)
       .nodeId("id")
       .nodeLabel("label")
@@ -370,13 +478,23 @@
     loadDataset(datasetMode);
   });
 
-  onDestroy(() => graph3D?._destructor?.());
+  onDestroy(() => {
+  graph3D?._destructor?.();
+  clingoWorker?.terminate();
+});
 </script>
 
 <div bind:this={container} class="graph"></div>
 
 <!-- TOOLBAR -->
 <div class="toolbar">
+<button on:click={runMaximumClique}>
+  Run Maximum Clique
+</button>
+
+<button on:click={clearClique}>
+  Clear Clique
+</button>
   <img src="icon.png" alt="Icon" style="width:28px; height:28px; margin-right:6px;" />
 
   <div class="search-wrap">
