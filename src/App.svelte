@@ -364,58 +364,76 @@ async function runMaximumClique() {
   console.time("CLIQUE_TIME");
 
   const facts = getAspFactsLp(datasetMode);
-  const fullProgram = facts.trim() + "\n\n" + ASP_PROGRAM.trim() + "\n";
+  const fullProgram =
+    facts.trim() + "\n\n" + ASP_PROGRAM.trim() + "\n";
 
   return new Promise<void>((resolve) => {
 
     const handler = (e: MessageEvent) => {
-      console.log("🟢 [CLIQUE] Worker message:", e.data);
+      const msg = e.data;
 
-
-      if (e.data?.Result === "ERROR") {
-        console.error("❌ CLINGO ERROR:", e.data.Error);
+      if (msg?.Result === "ERROR") {
+        console.error("❌ CLINGO ERROR:", msg.Error);
         console.timeEnd("CLIQUE_TIME");
         clingoWorker.removeEventListener("message", handler);
         resolve();
         return;
       }
 
-      if (!e.data?.Call?.[0]?.Witnesses) return;
+      if (!msg?.Call?.[0]?.Witnesses) return;
 
-      const witnesses = e.data.Call[0].Witnesses;
-
-      if (!witnesses.length) {
-        console.warn("⚠️ No models found");
-        console.timeEnd("CLIQUE_TIME");
-        clingoWorker.removeEventListener("message", handler);
-        resolve();
-        return;
-      }
-
-      const witness = witnesses[witnesses.length - 1];
-
-      const inAtoms = witness.Value.filter((v: string) =>
-        v.startsWith("in(")
-      );
-
-      const ids = inAtoms
-        .map((atom: string) => {
-          const match = atom.match(/in\((\d+)\)/);
-          return match ? parseInt(match[1]) : null;
-        })
-        .filter(Boolean) as number[];
-
+      const witnesses = msg.Call[0].Witnesses;
       const aspGraph = getAspGraph(datasetMode);
 
-      const names = ids
-        .map((id) => aspGraph.index[id]?.name)
-        .filter(Boolean);
+      const allCliques: string[][] = [];
 
-      cliqueNodes = new Set(names);
+      for (const w of witnesses) {
+        const ids = w.Value
+          .filter((v: string) => v.startsWith("in("))
+          .map((atom: string) => {
+            const m = atom.match(/in\((\d+)\)/);
+            return m ? parseInt(m[1]) : null;
+          })
+          .filter(Boolean) as number[];
+
+        const names = ids
+          .map((id) => aspGraph.index[id]?.name)
+          .filter(Boolean);
+
+        if (names.length > 2) {
+          allCliques.push(names);
+        }
+      }
+
+      if (!allCliques.length) {
+        console.warn("⚠️ No clique > size 2 found");
+        console.timeEnd("CLIQUE_TIME");
+        clingoWorker.removeEventListener("message", handler);
+        resolve();
+        return;
+      }
+
+      // Ordina per dimensione decrescente
+      allCliques.sort((a, b) => b.length - a.length);
+
+      const maxSize = allCliques[0].length;
+
+      const maximumCliques = allCliques.filter(c => c.length === maxSize);
+      const otherCliques = allCliques.filter(c => c.length < maxSize);
+
+      console.log("🟢 Maximum Clique(s): size =", maxSize);
+      maximumCliques.forEach((c, i) =>
+        console.log(`  Max ${i + 1}:`, c)
+      );
+
+      console.log("⚪ Other Cliques (size > 1):");
+      otherCliques.forEach((c, i) =>
+        console.log(`  Clique ${i + 1} (size=${c.length}):`, c)
+      );
+
+      cliqueNodes = new Set(maximumCliques[0]);
       refreshNodeVisuals();
 
-      console.log("🟢 Clique size:", names.length);
-console.log("🟢 Clique nodes:", names);
       console.timeEnd("CLIQUE_TIME");
 
       clingoWorker.removeEventListener("message", handler);
@@ -424,14 +442,14 @@ console.log("🟢 Clique nodes:", names);
 
     clingoWorker.addEventListener("message", handler);
 
-   clingoWorker.postMessage({
-  type: "run",
-  args: [
-    fullProgram,
-    0,
-    []
-  ]
-});
+    clingoWorker.postMessage({
+      type: "run",
+      args: [
+        fullProgram,
+        0,
+        ["--opt-mode=enum"]
+      ]
+    });
   });
 }  
 let clingoWorker:Worker;
