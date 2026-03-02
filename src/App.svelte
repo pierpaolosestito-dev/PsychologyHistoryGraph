@@ -381,7 +381,7 @@ data = originalData;
     const targetIsPerson = personDetailsMap.has(targetId);
 
     // Rigoroso: tieni solo link persona <-> luogo
-    return sourceIsPerson !== targetIsPerson;
+    return visibleNodes.has(sourceId) && visibleNodes.has(targetId);
   });
 
   data = {
@@ -516,11 +516,66 @@ data = originalData;
 #maximize { 1,V : in(V) }.
 
 #show in/1.`;
+
+function buildAspFactsFromCurrentData() {
+  if (!data) return { facts: "", reverseIndex: {} };
+
+  const indexMap = new Map<string, number>();
+  const reverseIndex: Record<number, string> = {};
+
+  let counter = 1;
+
+  // assegna ID numerici ai nodi visibili
+  for (const node of data.nodes) {
+    indexMap.set(node.id, counter);
+    reverseIndex[counter] = node.id;
+    counter++;
+  }
+
+  let facts = "";
+
+  // node facts
+  for (const [_, idx] of indexMap) {
+    facts += `node(${idx}).\n`;
+  }
+
+  // edge facts
+  for (const link of data.links) {
+    const sourceId =
+      typeof link.source === "object" ? link.source.id : link.source;
+
+    const targetId =
+      typeof link.target === "object" ? link.target.id : link.target;
+
+    const s = indexMap.get(sourceId);
+    const t = indexMap.get(targetId);
+
+    if (s && t) {
+      facts += `edge(${s},${t}).\n`;
+      facts += `edge(${t},${s}).\n`;
+    }
+  }
+
+  return { facts, reverseIndex };
+}
+
 async function runMaximumClique() {
-  console.log("🔵 [CLIQUE] Starting computation...");
+  console.log("🔵 [CLIQUE] Starting computation on FILTERED graph...");
   console.time("CLIQUE_TIME");
 
-  const facts = getAspFactsLp(datasetMode);
+  if (!data || !data.nodes?.length) {
+    console.warn("⚠️ No visible nodes. Aborting clique computation.");
+    return;
+  }
+
+  // 🔹 Costruisci fatti ASP dal grafo ATTUALMENTE visibile
+  const { facts, reverseIndex } = buildAspFactsFromCurrentData();
+
+  if (!facts.trim()) {
+    console.warn("⚠️ No facts generated. Aborting.");
+    return;
+  }
+
   const fullProgram =
     facts.trim() + "\n\n" + ASP_PROGRAM.trim() + "\n";
 
@@ -540,7 +595,6 @@ async function runMaximumClique() {
       if (!msg?.Call?.[0]?.Witnesses) return;
 
       const witnesses = msg.Call[0].Witnesses;
-      const aspGraph = getAspGraph(datasetMode);
 
       const allCliques: string[][] = [];
 
@@ -554,7 +608,7 @@ async function runMaximumClique() {
           .filter(Boolean) as number[];
 
         const names = ids
-          .map((id) => aspGraph.index[id]?.name)
+          .map((id) => reverseIndex[id])
           .filter(Boolean);
 
         if (names.length > 2) {
@@ -563,14 +617,14 @@ async function runMaximumClique() {
       }
 
       if (!allCliques.length) {
-        console.warn("⚠️ No clique > size 2 found");
+        console.warn("⚠️ No clique > size 2 found in filtered graph");
         console.timeEnd("CLIQUE_TIME");
         clingoWorker.removeEventListener("message", handler);
         resolve();
         return;
       }
 
-      // Ordina per dimensione decrescente
+      // 🔹 Ordina per dimensione decrescente
       allCliques.sort((a, b) => b.length - a.length);
 
       const maxSize = allCliques[0].length;
@@ -578,7 +632,7 @@ async function runMaximumClique() {
       const maximumCliques = allCliques.filter(c => c.length === maxSize);
       const otherCliques = allCliques.filter(c => c.length < maxSize);
 
-      console.log("🟢 Maximum Clique(s): size =", maxSize);
+      console.log("🟢 Maximum Clique(s) on FILTERED graph: size =", maxSize);
       maximumCliques.forEach((c, i) =>
         console.log(`  Max ${i + 1}:`, c)
       );
@@ -588,6 +642,7 @@ async function runMaximumClique() {
         console.log(`  Clique ${i + 1} (size=${c.length}):`, c)
       );
 
+      // 🔹 Evidenzia la prima maximum clique
       cliqueNodes = new Set(maximumCliques[0]);
       refreshNodeVisuals();
 
@@ -608,7 +663,7 @@ async function runMaximumClique() {
       ]
     });
   });
-}  
+}
 let clingoWorker:Worker;
   // ---------------- LIFECYCLE ----------------
   // ---------------- LIFECYCLE ----------------
