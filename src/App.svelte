@@ -19,10 +19,11 @@
 } from "./data/datasets";
   import InfoPanel from "./components/InfoPanel.svelte";
   import HistoryPanel from "./components/HistoryPanel.svelte";
-
+  import SolverPanel from "./components/SolverPanel.svelte";
   
   let container: HTMLDivElement;
   let graph3D: any;
+  
 
   // ---------------- STATE ----------------
   let data: any = null;
@@ -50,7 +51,26 @@
   let neighborMap: Map<string, Set<string>> = new Map();
   let highlightedNeighbors = new Set<string>();
   let cliqueNodes = new Set<string>();
-  let datasetMode: DatasetMode = "all";
+  // ---------------- SOLVER STATE ----------------
+let showSolverPanel = false;
+
+let maximumCliques: string[][] = [];
+let allCliques: string[][] = [];
+
+let solverStats = {
+  totalCliques: 0,
+  maxSize: 0,
+  histogram: new Map<number, number>(),
+  timeMs: undefined as number | undefined,
+  nodesCount: undefined as number | undefined,
+  linksCount: undefined as number | undefined,
+  datasetMode: undefined as string | undefined,
+  periodLabel: undefined as string | undefined
+};
+
+let minCliqueSize = 3;
+let topPerSize = 5;
+    let datasetMode: DatasetMode = "all";
 
   function normalizeName(s: string) {
   return (s ?? "")
@@ -579,6 +599,8 @@ async function runMaximumClique() {
   const fullProgram =
     facts.trim() + "\n\n" + ASP_PROGRAM.trim() + "\n";
 
+  const t0 = performance.now();
+
   return new Promise<void>((resolve) => {
 
     const handler = (e: MessageEvent) => {
@@ -594,9 +616,11 @@ async function runMaximumClique() {
 
       if (!msg?.Call?.[0]?.Witnesses) return;
 
+      const t1 = performance.now();
+
       const witnesses = msg.Call[0].Witnesses;
 
-      const allCliques: string[][] = [];
+      const foundCliques: string[][] = [];
 
       for (const w of witnesses) {
         const ids = w.Value
@@ -612,11 +636,11 @@ async function runMaximumClique() {
           .filter(Boolean);
 
         if (names.length > 2) {
-          allCliques.push(names);
+          foundCliques.push(names);
         }
       }
 
-      if (!allCliques.length) {
+      if (!foundCliques.length) {
         console.warn("⚠️ No clique > size 2 found in filtered graph");
         console.timeEnd("CLIQUE_TIME");
         clingoWorker.removeEventListener("message", handler);
@@ -625,25 +649,49 @@ async function runMaximumClique() {
       }
 
       // 🔹 Ordina per dimensione decrescente
-      allCliques.sort((a, b) => b.length - a.length);
+      foundCliques.sort((a, b) => b.length - a.length);
 
-      const maxSize = allCliques[0].length;
+      const maxSize = foundCliques[0].length;
 
-      const maximumCliques = allCliques.filter(c => c.length === maxSize);
-      const otherCliques = allCliques.filter(c => c.length < maxSize);
+      const maxCliques = foundCliques.filter(c => c.length === maxSize);
 
       console.log("🟢 Maximum Clique(s) on FILTERED graph: size =", maxSize);
-      maximumCliques.forEach((c, i) =>
+      maxCliques.forEach((c, i) =>
         console.log(`  Max ${i + 1}:`, c)
       );
 
       console.log("⚪ Other Cliques (size > 1):");
-      otherCliques.forEach((c, i) =>
-        console.log(`  Clique ${i + 1} (size=${c.length}):`, c)
-      );
+      foundCliques
+        .filter(c => c.length < maxSize)
+        .forEach((c, i) =>
+          console.log(`  Clique ${i + 1} (size=${c.length}):`, c)
+        );
+
+      // 🔹 Costruisci istogramma
+      const hist = new Map<number, number>();
+      for (const c of foundCliques) {
+        hist.set(c.length, (hist.get(c.length) ?? 0) + 1);
+      }
+
+      // 🔹 Salva stato globale
+      maximumCliques = maxCliques;
+      allCliques = foundCliques;
+
+      solverStats = {
+        totalCliques: foundCliques.length,
+        maxSize,
+        histogram: hist,
+        timeMs: t1 - t0,
+        nodesCount: data.nodes.length,
+        linksCount: data.links.length,
+        datasetMode,
+        periodLabel: `${currentStart}–${currentEnd}`
+      };
+
+      showSolverPanel = true;
 
       // 🔹 Evidenzia la prima maximum clique
-      cliqueNodes = new Set(maximumCliques[0]);
+      cliqueNodes = new Set(maxCliques[0]);
       refreshNodeVisuals();
 
       console.timeEnd("CLIQUE_TIME");
@@ -820,7 +868,19 @@ onMount(() => {
     }, 140);
   }}
 />
-
+<SolverPanel
+  open={showSolverPanel}
+  stats={solverStats}
+  maximumCliques={maximumCliques}
+  allCliques={allCliques}
+  bind:minSize={minCliqueSize}
+  bind:topPerSize={topPerSize}
+  on:close={() => showSolverPanel = false}
+  on:highlight={(e) => {
+    cliqueNodes = new Set(e.detail);
+    refreshNodeVisuals();
+  }}
+/>
 
 <style>
   :global(body) {
