@@ -19,6 +19,7 @@
 
   export let selectedNodeId: string | null = null;
 
+  // ⚠️ QUESTI DEVONO RESTARE export per il bind
   export let minSize: number = 3;
   export let topPerSize: number = 5;
 
@@ -54,6 +55,17 @@
 
   $: filteredCliques = getFilteredCliques();
   $: grouped = groupCliques(filteredCliques);
+
+  // Analisi nodo selezionato
+  $: selectedCliqueCount =
+    selectedNodeId
+      ? allCliques.filter(c => c.includes(selectedNodeId)).length
+      : 0;
+
+  $: selectedInMaximum =
+    selectedNodeId
+      ? maximumCliques.some(c => c.includes(selectedNodeId))
+      : false;
 
   function groupCliques(cliques: string[][]) {
     const map = new Map<number, string[][]>();
@@ -106,19 +118,35 @@
   <div class="solver-meta">
     <div><strong>Total cliques:</strong> {stats?.totalCliques}</div>
     <div><strong>Maximum size:</strong> {stats?.maxSize}</div>
+
     {#if stats?.timeMs}
       <div><strong>Solver time:</strong> {stats.timeMs.toFixed(2)} ms</div>
     {/if}
+
     {#if stats?.nodesCount}
       <div><strong>Nodes:</strong> {stats.nodesCount}</div>
     {/if}
+
     {#if stats?.linksCount}
       <div><strong>Edges:</strong> {stats.linksCount}</div>
     {/if}
+
     {#if stats?.periodLabel}
       <div><strong>Period:</strong> {stats.periodLabel}</div>
     {/if}
   </div>
+
+  <!-- ANALISI NODO SELEZIONATO -->
+  {#if selectedNodeId}
+  <div class="selected-analysis">
+    <div><strong>Selected node:</strong> {selectedNodeId}</div>
+    <div><strong>Cliques containing it:</strong> {selectedCliqueCount}</div>
+    <div>
+      <strong>In maximum clique:</strong>
+      {selectedInMaximum ? "YES" : "NO"}
+    </div>
+  </div>
+  {/if}
 
   <!-- CONTROLS -->
   <div class="solver-controls">
@@ -185,6 +213,9 @@
         {#each group.cliques as c}
           <div class="clique-item" on:click={() => highlightClique(c)}>
             {c.join(", ")}
+            {#if c.length === stats?.maxSize}
+              <span class="max-badge">MAX</span>
+            {/if}
           </div>
         {/each}
       </div>
@@ -229,6 +260,13 @@
     opacity: 0.85;
   }
 
+  .selected-analysis {
+    margin-top: 10px;
+    padding: 10px;
+    background: rgba(99,102,241,0.15);
+    border-radius: 8px;
+  }
+
   .solver-controls {
     margin-top: 14px;
     margin-bottom: 14px;
@@ -270,10 +308,21 @@
     border-radius: 6px;
     cursor: pointer;
     font-size: 12px;
+    display: flex;
+    justify-content: space-between;
   }
 
   .clique-item:hover {
     background: rgba(56,189,248,0.35);
+  }
+
+  .max-badge {
+    font-size: 10px;
+    background: #facc15;
+    color: black;
+    padding: 2px 4px;
+    border-radius: 4px;
+    margin-left: 6px;
   }
 
   .empty {

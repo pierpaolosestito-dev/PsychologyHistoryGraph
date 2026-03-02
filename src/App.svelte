@@ -873,6 +873,7 @@ onMount(() => {
   stats={solverStats}
   maximumCliques={maximumCliques}
   allCliques={allCliques}
+  selectedNodeId={selectedId}
   bind:minSize={minCliqueSize}
   bind:topPerSize={topPerSize}
   on:close={() => showSolverPanel = false}
