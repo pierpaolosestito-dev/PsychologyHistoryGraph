@@ -1,31 +1,31 @@
 <script lang="ts">
-  // Props dal parent (App.svelte)
+  import type { NodeDetails } from "../data/details";
+
+  // Props dal parent
   export let selectedNode: any = null;
+  export let selectedDetails: NodeDetails | null = null;
   export let rootSelectedId: string | null = null;
   export let neighborIds: string[] = [];
   export let highlightedNeighbors: Set<string> = new Set();
 
-  // callbacks dal parent
   export let onBackToRoot: () => void;
   export let onViewNeighbor: (id: string) => void;
   export let onCommitNeighbor: (id: string) => void;
 
-  // ---- MODAL (placeholder) ----
   let showModal = false;
 
   function openModal() {
     showModal = true;
   }
+
   function closeModal() {
     showModal = false;
   }
 
-  // Chiudi con ESC
   function handleKeydown(e: KeyboardEvent) {
     if (e.key === "Escape") closeModal();
   }
 
-  // click su backdrop chiude
   function onBackdropClick(e: MouseEvent) {
     if (e.target === e.currentTarget) closeModal();
   }
@@ -33,7 +33,6 @@
 
 {#if selectedNode}
   <div class="info-panel">
-    <!-- Titolo cliccabile -->
     <button class="title-btn" type="button" on:click={openModal}>
       <h3>{selectedNode.label}</h3>
     </button>
@@ -76,7 +75,6 @@
     </ul>
   </div>
 
-  <!-- MODAL PLACEHOLDER -->
   {#if showModal}
     <div
       class="modal-backdrop"
@@ -87,13 +85,77 @@
       tabindex="0"
     >
       <div class="modal-card">
-        <div class="modal-header">Test</div>
-        <div class="modal-body">Test</div>
-        <div class="modal-footer">Test</div>
 
-        <button class="modal-close" type="button" on:click={closeModal} aria-label="Chiudi">
-          ✕
-        </button>
+        <!-- HEADER -->
+        <div class="modal-header">
+          {selectedNode.label}
+        </div>
+
+        <!-- BODY -->
+        <div class="modal-body">
+
+          {#if selectedDetails}
+
+            {#if selectedDetails.tipo === "person"}
+
+              <p><strong>Nascita:</strong>
+                {selectedDetails.luogo_nascita}
+                {#if selectedDetails.anno_nascita}
+                  ({selectedDetails.anno_nascita})
+                {/if}
+              </p>
+
+              {#if selectedDetails.anno_morte}
+                <p><strong>Morte:</strong> {selectedDetails.anno_morte}</p>
+              {/if}
+
+              {#if selectedDetails.periodo}
+                <p><strong>Periodo:</strong> {selectedDetails.periodo}</p>
+              {/if}
+
+              <hr />
+
+              {#if selectedDetails.biografia_html}
+                <div class="biografia">
+                  {@html selectedDetails.biografia_html}
+                </div>
+              {/if}
+
+            {:else if selectedDetails.tipo === "place"}
+
+              {#if selectedDetails.immagine_url}
+                <img
+                  src={selectedDetails.immagine_url}
+                  alt={selectedDetails.titolo}
+                  class="place-image"
+                />
+              {/if}
+
+              {#if selectedDetails.citta}
+                <p><strong>Città:</strong> {selectedDetails.citta}</p>
+              {/if}
+
+              {#if selectedDetails.contenuto}
+                <div class="contenuto">
+                  {@html selectedDetails.contenuto}
+                </div>
+              {/if}
+
+            {/if}
+
+          {:else}
+            <p>Nessun dettaglio disponibile.</p>
+          {/if}
+
+        </div>
+
+        <!-- FOOTER -->
+        <div class="modal-footer">
+          <button class="modal-close" type="button" on:click={closeModal}>
+            ✕
+          </button>
+        </div>
+
       </div>
     </div>
   {/if}
@@ -127,36 +189,9 @@
   .title-btn h3 {
     margin: 0;
     font-size: 16px;
-    line-height: 1.2;
     text-decoration: underline;
-    text-underline-offset: 3px;
   }
 
-  .title-btn:hover h3 {
-    opacity: 0.9;
-  }
-
-  .back-btn {
-    width: 100%;
-    margin: 6px 0 10px;
-    padding: 6px;
-    border: none;
-    border-radius: 4px;
-    background: rgba(56, 189, 248, 0.2);
-    color: #e2e8f0;
-    cursor: pointer;
-  }
-
-  .explore-btn {
-    border: none;
-    background: rgba(255, 255, 255, 0.08);
-    color: #e2e8f0;
-    cursor: pointer;
-    border-radius: 4px;
-    padding: 2px 6px;
-  }
-
-  /* ---------- MODAL ---------- */
   .modal-backdrop {
     position: fixed;
     inset: 0;
@@ -166,40 +201,52 @@
     align-items: center;
     justify-content: center;
     padding: 18px;
-    outline: none;
   }
 
   .modal-card {
-    width: min(520px, 92vw);
+    width: min(720px, 92vw);
+    max-height: 85vh;
+    overflow-y: auto;
     background: rgba(15, 23, 42, 0.98);
     border-radius: 12px;
-    box-shadow: 0 18px 60px rgba(0, 0, 0, 0.55);
-    border: 1px solid rgba(148, 163, 184, 0.14);
-    position: relative;
-    overflow: hidden;
+    padding-bottom: 20px;
   }
 
-  .modal-header,
-  .modal-footer {
-    padding: 12px 14px;
-    background: rgba(2, 6, 23, 0.35);
+  .modal-header {
+    padding: 16px;
+    font-size: 20px;
     font-weight: 600;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.2);
   }
 
   .modal-body {
-    padding: 14px;
+    padding: 16px;
+    line-height: 1.6;
+  }
+
+  .biografia {
+    font-size: 14px;
+  }
+
+  .place-image {
+    width: 100%;
+    border-radius: 8px;
+    margin-bottom: 12px;
+  }
+
+  .modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    padding: 12px 16px;
   }
 
   .modal-close {
-    position: absolute;
-    top: 10px;
-    right: 10px;
     border: none;
     background: rgba(255, 255, 255, 0.08);
     color: #e2e8f0;
     border-radius: 8px;
-    width: 32px;
-    height: 32px;
+    width: 36px;
+    height: 36px;
     cursor: pointer;
   }
 </style>

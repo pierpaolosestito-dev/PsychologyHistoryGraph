@@ -4,7 +4,13 @@
   import Graph from "graphology";
   import * as THREE from "three";
   import { forceManyBody, forceCenter, forceLink } from "d3-force-3d";
-
+  import TimelineSlider from "./components/TimelineSlider.svelte";
+  import {
+  loadDetails,
+  personDetailsMap,
+  placeDetailsMap,
+  type NodeDetails
+} from "./data/details";
   import {
   DATASETS,
   type DatasetMode,
@@ -14,22 +20,42 @@
   import InfoPanel from "./components/InfoPanel.svelte";
   import HistoryPanel from "./components/HistoryPanel.svelte";
 
+  
   let container: HTMLDivElement;
   let graph3D: any;
 
   // ---------------- STATE ----------------
   let data: any = null;
+  let originalData: any = null;
   let query = "";
+  let currentStart = 1776;
+  let currentEnd = 2017;
 
   let rootSelectedId: string | null = null;
   let selectedId: string | null = null;
   let selectedNode: any = null;
 
+  function updateSelectedDetails(id: string) {
+  if (personDetailsMap.has(id)) {
+    selectedDetails = personDetailsMap.get(id)!;
+  } else if (placeDetailsMap.has(id)) {
+    selectedDetails = placeDetailsMap.get(id)!;
+  } else {
+    selectedDetails = null;
+  }
+}
+
+  let selectedDetails: NodeDetails | null = null;
   let neighborMap: Map<string, Set<string>> = new Map();
   let highlightedNeighbors = new Set<string>();
   let cliqueNodes = new Set<string>();
   let datasetMode: DatasetMode = "all";
 
+  function normalizeName(s: string) {
+  return (s ?? "")
+    .trim()
+    .replace(/\s+/g, " ");
+}
   // ---------------- HISTORY ----------------
   let history: string[] = [];
 
@@ -205,27 +231,51 @@
 
   // ---------------- GRAPH BUILD ----------------
   function buildGraphFromJson(json: Record<string, string[]>) {
-    const graph = new Graph({ type: "undirected" });
-    const edgeSet = new Set<string>();
+  const graph = new Graph({ type: "undirected" });
+  const edgeSet = new Set<string>();
 
-    Object.entries(json).forEach(([src, targets]) => {
-      if (!graph.hasNode(src)) graph.addNode(src, { label: src });
-      targets.forEach((dst) => {
-        if (!graph.hasNode(dst)) graph.addNode(dst, { label: dst });
-        const key = [src, dst].sort().join("||");
-        if (!edgeSet.has(key)) {
-          edgeSet.add(key);
-          graph.addEdge(src, dst);
-        }
-      });
-    });
-
-    const nodes: any[] = [];
-    const links: any[] = [];
-    graph.forEachNode((id, attrs) => nodes.push({ id, label: attrs.label }));
-    graph.forEachEdge((_, __, s, t) => links.push({ source: s, target: t }));
-    return { nodes, links };
+  function normalizeName(s: string) {
+    return (s ?? "")
+      .trim()
+      .replace(/\s+/g, " ");
   }
+
+  Object.entries(json).forEach(([src, targets]) => {
+    const srcN = normalizeName(src);
+
+    if (!graph.hasNode(srcN)) {
+      graph.addNode(srcN, { label: srcN });
+    }
+
+    targets.forEach((dst) => {
+      const dstN = normalizeName(dst);
+
+      if (!graph.hasNode(dstN)) {
+        graph.addNode(dstN, { label: dstN });
+      }
+
+      const key = [srcN, dstN].sort().join("||");
+
+      if (!edgeSet.has(key)) {
+        edgeSet.add(key);
+        graph.addEdge(srcN, dstN);
+      }
+    });
+  });
+
+  const nodes: any[] = [];
+  const links: any[] = [];
+
+  graph.forEachNode((id, attrs) => {
+    nodes.push({ id, label: attrs.label });
+  });
+
+  graph.forEachEdge((_, __, s, t) => {
+    links.push({ source: s, target: t });
+  });
+
+  return { nodes, links };
+}
 
   function buildNeighborMap() {
     neighborMap = new Map();
@@ -241,6 +291,8 @@
 
   // ---------------- DATASET SWITCH ----------------
   function loadDataset(mode: DatasetMode) {
+    currentStart = 1776;
+    currentEnd = 2017;
     datasetMode = mode;
     rootSelectedId = null;
     selectedId = null;
@@ -249,7 +301,8 @@
     cliqueNodes = new Set();
     clearHistory();
 
-    data = buildGraphFromJson(DATASETS[mode]);
+    originalData = buildGraphFromJson(DATASETS[mode]);
+data = originalData;
     buildNeighborMap();
     buildSearchIndex(DATASETS[mode]);
 
@@ -258,6 +311,104 @@
     graph3D.cameraPosition({ x: 0, y: 0, z: 220 }, { x: 0, y: 0, z: 0 }, 800);
   }
 
+ function applyTimelineFilter() {
+  console.log("[TL] applyTimelineFilter", {
+    currentStart,
+    currentEnd,
+    nodes: originalData?.nodes?.length
+  });
+
+  if (!originalData) return;
+
+  // --- 1) Persone visibili (vive nel periodo) ---
+  const visiblePersons = new Set<string>();
+
+  for (const node of originalData.nodes) {
+    const details = personDetailsMap.get(node.id);
+    if (!details) continue;
+
+    const birth = details.anno_nascita ?? 0;
+    const death = details.anno_morte ?? 9999;
+
+    if (birth <= currentEnd && death >= currentStart) {
+      visiblePersons.add(node.id);
+    }
+  }
+
+  // --- 2) Luoghi visibili: SOLO quelli collegati direttamente a persone visibili ---
+  const visiblePlaces = new Set<string>();
+
+  for (const link of originalData.links) {
+    const sourceId =
+      typeof link.source === "object" && link.source !== null
+        ? (link.source as any).id
+        : (link.source as string);
+
+    const targetId =
+      typeof link.target === "object" && link.target !== null
+        ? (link.target as any).id
+        : (link.target as string);
+
+    // Se la sorgente è una persona visibile, il target (se non è persona) lo consideriamo luogo
+    if (visiblePersons.has(sourceId) && !personDetailsMap.has(targetId)) {
+      visiblePlaces.add(targetId);
+    }
+
+    // Viceversa: se il target è persona visibile, il source (se non è persona) è luogo
+    if (visiblePersons.has(targetId) && !personDetailsMap.has(sourceId)) {
+      visiblePlaces.add(sourceId);
+    }
+  }
+
+  // --- 3) Nodo visibile = persona visibile OR luogo visibile ---
+  const visibleNodes = new Set<string>([...visiblePersons, ...visiblePlaces]);
+
+  // --- 4) Filtra nodi ---
+  const filteredNodes = originalData.nodes.filter((n: any) => visibleNodes.has(n.id));
+
+  // --- 5) Filtra archi: entrambi gli estremi devono essere visibili ---
+  // + (opzionale ma consigliato) tieni SOLO archi persona-luogo per essere "rigoroso"
+  const filteredLinks = originalData.links.filter((l: any) => {
+    const sourceId =
+      typeof l.source === "object" && l.source !== null ? l.source.id : l.source;
+    const targetId =
+      typeof l.target === "object" && l.target !== null ? l.target.id : l.target;
+
+    if (!visibleNodes.has(sourceId) || !visibleNodes.has(targetId)) return false;
+
+    const sourceIsPerson = personDetailsMap.has(sourceId);
+    const targetIsPerson = personDetailsMap.has(targetId);
+
+    // Rigoroso: tieni solo link persona <-> luogo
+    return sourceIsPerson !== targetIsPerson;
+  });
+
+  data = {
+    nodes: filteredNodes,
+    links: filteredLinks
+  };
+
+  graph3D.graphData(data);
+
+  // Ricostruisci neighborMap coerente con i nuovi link
+  neighborMap = new Map();
+  data.links.forEach((l: any) => {
+    const s =
+      typeof l.source === "object" && l.source !== null ? l.source.id : l.source;
+    const t =
+      typeof l.target === "object" && l.target !== null ? l.target.id : l.target;
+
+    if (!neighborMap.has(s)) neighborMap.set(s, new Set());
+    if (!neighborMap.has(t)) neighborMap.set(t, new Set());
+    neighborMap.get(s)!.add(t);
+    neighborMap.get(t)!.add(s);
+  });
+
+  console.log("[TL] visiblePersons:", visiblePersons.size);
+  console.log("[TL] visiblePlaces:", visiblePlaces.size);
+  console.log("[TL] filteredNodes:", filteredNodes.length);
+  console.log("[TL] filteredLinks:", filteredLinks.length);
+}
   // ---------------- INTERACTIONS ----------------
   function focusNode(id: string) {
     const node = data.nodes.find((n: any) => n.id === id);
@@ -270,10 +421,15 @@
   }
 
   function selectNode(id: string) {
-    const node = data.nodes.find((n: any) => n.id === id);
-    const degree = data.links.filter((l: any) => l.source === id || l.target === id).length;
-    selectedNode = { ...node, degree };
-  }
+  const node = data.nodes.find((n: any) => n.id === id);
+  const degree = data.links.filter(
+    (l: any) => l.source === id || l.target === id
+  ).length;
+
+  selectedNode = { ...node, degree };
+
+  updateSelectedDetails(id); 
+}
 
   function viewNeighbor(id: string) {
     highlightedNeighbors = new Set([id]);
@@ -454,17 +610,26 @@ async function runMaximumClique() {
 }  
 let clingoWorker:Worker;
   // ---------------- LIFECYCLE ----------------
-  onMount(() => {
+  // ---------------- LIFECYCLE ----------------
+onMount(() => {
+
+  (async () => {
+
+    // 1️⃣ Carico CSV dettagli
+    await loadDetails();
+
+    // 2️⃣ Inizializzo Clingo
     clingoWorker = new Worker(
-  new URL("./clingo/clingo.web.worker.js", import.meta.url),
-  { type: "module" }
-);
+      new URL("./clingo/clingo.web.worker.js", import.meta.url),
+      { type: "module" }
+    );
 
-clingoWorker.postMessage({
-  type: "init",
-  wasmUrl: new URL("./clingo/clingo.wasm", import.meta.url).toString()
-});
+    clingoWorker.postMessage({
+      type: "init",
+      wasmUrl: new URL("./clingo/clingo.wasm", import.meta.url).toString()
+    });
 
+    // 3️⃣ Inizializzo grafico
     graph3D = ForceGraph3D()(container)
       .nodeId("id")
       .nodeLabel("label")
@@ -484,6 +649,7 @@ clingoWorker.postMessage({
       startHistory(node.id);
       focusNode(node.id);
       selectNode(node.id);
+      updateSelectedDetails(node.id);
       refreshNodeVisuals();
     });
 
@@ -494,8 +660,10 @@ clingoWorker.postMessage({
       .d3Force("link", forceLink().distance(70).strength(0.5));
 
     loadDataset(datasetMode);
-  });
 
+  })();
+
+});
   onDestroy(() => {
   graph3D?._destructor?.();
   clingoWorker?.terminate();
@@ -559,6 +727,7 @@ clingoWorker.postMessage({
 
 <InfoPanel
   {selectedNode}
+  {selectedDetails}
   {rootSelectedId}
   neighborIds={Array.from(neighborMap.get(rootSelectedId ?? "") ?? [])}
   {highlightedNeighbors}
@@ -578,6 +747,16 @@ clingoWorker.postMessage({
     focusNode(id);
     selectNode(id);
     refreshNodeVisuals();
+  }}
+/>
+
+<TimelineSlider
+  start={currentStart}
+  end={currentEnd}
+  on:change={(e) => {
+    currentStart = e.detail.start;
+    currentEnd = e.detail.end;
+    applyTimelineFilter();
   }}
 />
 
