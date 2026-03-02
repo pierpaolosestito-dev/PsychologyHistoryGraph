@@ -30,6 +30,7 @@
   let query = "";
   let currentStart = 1776;
   let currentEnd = 2017;
+  let timelineTimeout: any = null;
 
   let rootSelectedId: string | null = null;
   let selectedId: string | null = null;
@@ -756,7 +757,12 @@ onMount(() => {
   on:change={(e) => {
     currentStart = e.detail.start;
     currentEnd = e.detail.end;
-    applyTimelineFilter();
+
+    clearTimeout(timelineTimeout);
+    timelineTimeout = setTimeout(() => {
+      applyTimelineFilter();
+      graph3D?.d3ReheatSimulation?.();
+    }, 140);
   }}
 />
 

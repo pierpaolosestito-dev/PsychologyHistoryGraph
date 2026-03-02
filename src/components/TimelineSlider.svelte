@@ -6,32 +6,41 @@
   export let min = 1776;
   export let max = 2017;
 
-  // 🔹 Range controllato dal parent
-  export let start: number;
-  export let end: number;
+  // ✅ controllati dal parent (App.svelte)
+  export let start = min;
+  export let end = max;
+
+  // ✅ stato interno (per drag fluido)
+  let localStart = start;
+  let localEnd = end;
+
+  // ✅ quando il parent cambia start/end (es. loadDataset reset),
+  // aggiorniamo la UI del componente
+  $: if (start !== localStart) localStart = start;
+  $: if (end !== localEnd) localEnd = end;
 
   function emit() {
-    dispatch("change", { start, end });
+    dispatch("change", { start: localStart, end: localEnd });
   }
 
   function updateStart(e: Event) {
     const value = Number((e.target as HTMLInputElement).value);
-    start = Math.min(value, end);
+    localStart = Math.min(value, localEnd);
     emit();
   }
 
   function updateEnd(e: Event) {
     const value = Number((e.target as HTMLInputElement).value);
-    end = Math.max(value, start);
+    localEnd = Math.max(value, localStart);
     emit();
   }
 </script>
 
 <div class="timeline-container">
   <div class="timeline-label">
-    <span>{start}</span>
+    <span>{localStart}</span>
     <span>—</span>
-    <span>{end}</span>
+    <span>{localEnd}</span>
   </div>
 
   <div class="slider-wrapper">
@@ -39,7 +48,7 @@
       type="range"
       min={min}
       max={max}
-      bind:value={start}
+      value={localStart}
       on:input={updateStart}
       class="slider slider-start"
     />
@@ -48,7 +57,7 @@
       type="range"
       min={min}
       max={max}
-      bind:value={end}
+      value={localEnd}
       on:input={updateEnd}
       class="slider slider-end"
     />
