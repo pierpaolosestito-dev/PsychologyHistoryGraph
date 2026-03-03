@@ -1,3 +1,9 @@
+export interface PersonRole {
+  professione?: string;
+  macro_area?: string;
+  sotto_area?: string;
+}
+
 export interface PersonDetails {
   tipo: "person";
   nome: string;
@@ -6,6 +12,8 @@ export interface PersonDetails {
   anno_morte?: number;
   periodo?: string;
   biografia_html?: string;
+
+  roles?: PersonRole[];
 }
 
 export interface PlaceDetails {
@@ -57,6 +65,7 @@ function parseCSV(text: string): string[][] {
 export async function loadDetails() {
   await loadPersonsCSV();
   await loadPlacesCSV();
+  await loadMacroCSV();
 }
 
 async function loadPersonsCSV() {
@@ -115,4 +124,62 @@ async function loadPlacesCSV() {
   }
 
   console.log("Loaded places:", placeDetailsMap.size);
+}
+
+async function loadMacroCSV() {
+  const res = await fetch("protagonisti_con_macro.csv");
+  const text = await res.text();
+  const rows = parseCSV(text);
+
+  const header = rows[0];
+  const dataRows = rows.slice(1);
+
+  for (const row of dataRows) {
+    const obj: any = {};
+    header.forEach((h, i) => (obj[h] = row[i]));
+
+    const nome = obj["nome"]?.trim();
+    if (!nome) continue;
+
+    const nomeN = nome.trim().replace(/\s+/g, " ");
+
+    const professione =
+      obj["professione"]?.trim() ||
+      obj["professioni"]?.trim();
+
+    const macro_area = obj["macro_area"]?.trim();
+    const sotto_area = obj["sotto_area"]?.trim();
+
+    // Se la persona non esiste ancora nei dettagli, creiamo un record minimo
+    if (!personDetailsMap.has(nomeN)) {
+      personDetailsMap.set(nomeN, {
+        tipo: "person",
+        nome,
+        roles: []
+      });
+    }
+
+    const person = personDetailsMap.get(nomeN)!;
+
+    if (!person.roles) {
+      person.roles = [];
+    }
+
+    // Evitiamo duplicati identici
+    const alreadyExists = person.roles.some(r =>
+      r.professione === professione &&
+      r.macro_area === macro_area &&
+      r.sotto_area === sotto_area
+    );
+
+    if (!alreadyExists) {
+      person.roles.push({
+        professione,
+        macro_area,
+        sotto_area
+      });
+    }
+  }
+
+  console.log("Loaded macro roles for persons");
 }

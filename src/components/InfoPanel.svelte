@@ -113,6 +113,31 @@
                 <p><strong>Periodo:</strong> {selectedDetails.periodo}</p>
               {/if}
 
+              <!-- NUOVA SEZIONE: MACRO AREE -->
+              {#if selectedDetails.roles && selectedDetails.roles.length > 0}
+                <hr />
+                <p><strong>Ambiti professionali:</strong></p>
+                <ul>
+                  {#each selectedDetails.roles as role}
+                    <li>
+                      {#if role.professione}
+                        <strong>{role.professione}</strong>
+                      {/if}
+
+                      {#if role.macro_area || role.sotto_area}
+                        —
+                        {#if role.macro_area}
+                          {role.macro_area}
+                        {/if}
+                        {#if role.sotto_area}
+                          / {role.sotto_area}
+                        {/if}
+                      {/if}
+                    </li>
+                  {/each}
+                </ul>
+              {/if}
+
               <hr />
 
               {#if selectedDetails.biografia_html}

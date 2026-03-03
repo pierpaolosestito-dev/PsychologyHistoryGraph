@@ -70,8 +70,20 @@ let solverStats = {
 
 let minCliqueSize = 3;
 let topPerSize = 5;
+// ---------------- MACRO FILTER (OPTIONAL) ----------------
+let selectedMacroArea: string = "";
+let availableMacroAreas: string[] = [];
+
     let datasetMode: DatasetMode = "all";
 
+
+    function atomize(s: string) {
+  return s
+    .toLowerCase()
+    .replace(/&/g, "")
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
   function normalizeName(s: string) {
   return (s ?? "")
     .trim()
@@ -528,14 +540,27 @@ data = originalData;
     );
   }
 
-  const ASP_PROGRAM = `
+  const ASP_PROGRAM_DEFAULT = `
 { in(V) : node(V) }.
 
 :- in(U), in(V), U < V, not edge(U,V).
 
 #maximize { 1,V : in(V) }.
 
-#show in/1.`;
+#show in/1.
+`;
+
+const ASP_PROGRAM_FILTERED = (macroAtom: string) => `
+valid(V) :- node(V), macro(V, ${macroAtom}).
+
+{ in(V) : valid(V) }.
+
+:- in(U), in(V), U < V, not edge(U,V).
+
+#maximize { 1,V : in(V) }.
+
+#show in/1.
+`;
 
 function buildAspFactsFromCurrentData() {
   if (!data) return { facts: "", reverseIndex: {} };
@@ -559,6 +584,22 @@ function buildAspFactsFromCurrentData() {
     facts += `node(${idx}).\n`;
   }
 
+  // macro facts (solo persone)
+  for (const node of data.nodes) {
+    const details = personDetailsMap.get(node.id);
+    if (!details?.roles) continue;
+
+    const idx = indexMap.get(node.id);
+    if (!idx) continue;
+
+    for (const role of details.roles) {
+      if (role.macro_area) {
+        const atom = atomize(role.macro_area);
+        facts += `macro(${idx},${atom}).\n`;
+      }
+    }
+  }
+
   // edge facts
   for (const link of data.links) {
     const sourceId =
@@ -578,7 +619,6 @@ function buildAspFactsFromCurrentData() {
 
   return { facts, reverseIndex };
 }
-
 async function runMaximumClique() {
   console.log("🔵 [CLIQUE] Starting computation on FILTERED graph...");
   console.time("CLIQUE_TIME");
@@ -596,8 +636,17 @@ async function runMaximumClique() {
     return;
   }
 
-  const fullProgram =
-    facts.trim() + "\n\n" + ASP_PROGRAM.trim() + "\n";
+  let program: string;
+
+if (!selectedMacroArea) {
+  program = ASP_PROGRAM_DEFAULT;
+} else {
+  const atom = atomize(selectedMacroArea);
+  program = ASP_PROGRAM_FILTERED(atom);
+}
+
+const fullProgram =
+  facts.trim() + "\n\n" + program.trim() + "\n";
 
   const t0 = performance.now();
 
@@ -713,6 +762,17 @@ async function runMaximumClique() {
   });
 }
 let clingoWorker:Worker;
+function computeMacroAreas() {
+  const set = new Set<string>();
+
+  for (const details of personDetailsMap.values()) {
+    details.roles?.forEach(r => {
+      if (r.macro_area) set.add(r.macro_area);
+    });
+  }
+
+  availableMacroAreas = Array.from(set).sort();
+}
   // ---------------- LIFECYCLE ----------------
   // ---------------- LIFECYCLE ----------------
 onMount(() => {
@@ -721,6 +781,7 @@ onMount(() => {
 
     // 1️⃣ Carico CSV dettagli
     await loadDetails();
+    computeMacroAreas();
 
     // 2️⃣ Inizializzo Clingo
     clingoWorker = new Worker(
@@ -876,6 +937,8 @@ onMount(() => {
   selectedNodeId={selectedId}
   bind:minSize={minCliqueSize}
   bind:topPerSize={topPerSize}
+  bind:selectedMacroArea
+  {availableMacroAreas}
   on:close={() => showSolverPanel = false}
   on:highlight={(e) => {
     cliqueNodes = new Set(e.detail);

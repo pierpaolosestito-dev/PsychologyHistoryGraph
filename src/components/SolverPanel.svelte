@@ -19,9 +19,13 @@
 
   export let selectedNodeId: string | null = null;
 
-  // ⚠️ QUESTI DEVONO RESTARE export per il bind
+  // ⚠️ DEVONO RESTARE export per il bind
   export let minSize: number = 3;
   export let topPerSize: number = 5;
+
+  // ---------------- MACRO FILTER ----------------
+  export let selectedMacroArea: string | null = null;
+  export let availableMacroAreas: string[] = [];
 
   const dispatch = createEventDispatcher();
 
@@ -38,52 +42,68 @@
   }
 
   function getFilteredCliques() {
-    let base = allCliques ?? [];
+    const min = Number(minSize);
+    const safeMin = Number.isFinite(min) ? min : 0;
+
+    let base: any = allCliques ?? [];
+    if (!Array.isArray(base)) base = [];
 
     if (showOnlyMaximum) {
-      base = maximumCliques;
+      base = maximumCliques ?? [];
+      if (!Array.isArray(base)) base = [];
     }
 
     if (filterBySelectedNode && selectedNodeId) {
-      base = base.filter(c => c.includes(selectedNodeId));
+      base = base.filter(
+        (c: any) => Array.isArray(c) && c.includes(selectedNodeId)
+      );
     }
 
-    base = base.filter(c => c.length >= minSize);
+    base = base.filter(
+      (c: any) => Array.isArray(c) && c.length >= safeMin
+    );
 
-    return base;
+    return base as string[][];
   }
 
   $: filteredCliques = getFilteredCliques();
-  $: grouped = groupCliques(filteredCliques);
-
-  // Analisi nodo selezionato
-  $: selectedCliqueCount =
-    selectedNodeId
-      ? allCliques.filter(c => c.includes(selectedNodeId)).length
-      : 0;
-
-  $: selectedInMaximum =
-    selectedNodeId
-      ? maximumCliques.some(c => c.includes(selectedNodeId))
-      : false;
 
   function groupCliques(cliques: string[][]) {
+    if (!cliques || !cliques.length) return [];
+
+    const top = Number(topPerSize);
+    const safeTop = Number.isFinite(top) ? top : 5;
+
     const map = new Map<number, string[][]>();
 
     for (const c of cliques) {
+      if (!Array.isArray(c)) continue;
       if (!map.has(c.length)) map.set(c.length, []);
       map.get(c.length)!.push(c);
     }
 
-    const sizes = Array.from(map.keys()).sort((a,b)=>b-a);
+    const sizes = Array.from(map.keys()).sort((a, b) => b - a);
 
     return sizes.map(size => ({
       size,
       cliques: showAll
         ? map.get(size)!
-        : map.get(size)!.slice(0, topPerSize)
+        : map.get(size)!.slice(0, safeTop)
     }));
   }
+
+  $: grouped = groupCliques(filteredCliques ?? []);
+
+  // Analisi nodo selezionato
+  $: selectedCliqueCount =
+    selectedNodeId
+      ? (allCliques ?? []).filter(c => c.includes(selectedNodeId)).length
+      : 0;
+
+  $: selectedInMaximum =
+    selectedNodeId
+      ? (maximumCliques ?? []).some(c => c.includes(selectedNodeId))
+      : false;
 
   function downloadCSV() {
     if (!filteredCliques?.length) return;
@@ -136,7 +156,6 @@
     {/if}
   </div>
 
-  <!-- ANALISI NODO SELEZIONATO -->
   {#if selectedNodeId}
   <div class="selected-analysis">
     <div><strong>Selected node:</strong> {selectedNodeId}</div>
@@ -150,6 +169,16 @@
 
   <!-- CONTROLS -->
   <div class="solver-controls">
+
+    <label>
+      Macro Area
+      <select bind:value={selectedMacroArea}>
+        <option value="">-- none --</option>
+        {#each availableMacroAreas as area}
+          <option value={area}>{area}</option>
+        {/each}
+      </select>
+    </label>
 
     <label>
       Min clique size
@@ -277,6 +306,10 @@
 
   .solver-controls input[type="number"] {
     width: 70px;
+    margin-left: 6px;
+  }
+
+  .solver-controls select {
     margin-left: 6px;
   }
 
