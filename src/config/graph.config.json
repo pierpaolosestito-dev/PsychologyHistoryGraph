@@ -66,7 +66,7 @@
   "ui": {
     "toolbar": {
       "icon": {
-        "src": "/icon.png",
+        "src": "icon.png",
         "width": 28,
         "height": 28,
         "marginRight": 6
