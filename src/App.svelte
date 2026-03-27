@@ -161,24 +161,34 @@ let availableMacroAreas: string[] = [];
     searchNode(label);
   }
 
+  function getNodeType(node: any): string {
+  return node.type || "default";
+}
+
+function getNodeStyle(node: any) {
+  const type = getNodeType(node);
+  return GRAPH_CONFIG.nodeTypes[type] || GRAPH_CONFIG.nodeTypes.default;
+}
+
   // ---------------- COLOR UTILS ----------------
-  function colorFromString(str: string) {
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-      hash = str.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    return `hsl(${Math.abs(hash) % 360}, 70%, 55%)`;
-  }
+  
 
   const C = GRAPH_CONFIG.colors;
-  const colorAccessor = (n: any) => {
-    if (cliqueNodes.has(n.id)) return C.clique;
-    if (!selectedId) return colorFromString(n.id);
-    if (n.id === selectedId) return C.root;
-    if (highlightedNeighbors.has(n.id)) return C.preview;
-    if (neighborMap.get(selectedId)?.has(n.id)) return C.neighbor;
-    return C.default;
-  };
+  const H = GRAPH_CONFIG.nodeTypes.highlight;
+
+const colorAccessor = (n: any) => {
+  if (cliqueNodes.has(n.id)) return H.clique;
+
+  if (!selectedId) {
+    return getNodeStyle(n).color;
+  }
+
+  if (n.id === selectedId) return H.root;
+  if (highlightedNeighbors.has(n.id)) return H.preview;
+  if (neighborMap.get(selectedId)?.has(n.id)) return H.neighbor;
+
+  return getNodeStyle(n).color;
+};
 
   function opacityForNode(nodeId: string) {
     if (cliqueNodes.has(nodeId)) return 1;
@@ -191,23 +201,34 @@ let availableMacroAreas: string[] = [];
 
   // ---------------- ICON + RING ----------------
   const textureLoader = new THREE.TextureLoader();
-  const iconTexture = textureLoader.load(GRAPH_CONFIG.node.icon);
-  iconTexture.colorSpace = THREE.SRGBColorSpace;
+  const textureCache = new Map<string, THREE.Texture>();
+
+function getTexture(path: string) {
+  if (!textureCache.has(path)) {
+    const tex = textureLoader.load(path);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    textureCache.set(path, tex);
+  }
+  return textureCache.get(path)!;
+}
   const R = GRAPH_CONFIG.node.ring;
   const ringGeometry = new THREE.RingGeometry(R.innerRadius, R.outerRadius, R.segments);
 
-  function makeIconSprite(size = 14, opacity = 1) {
-    const sprite = new THREE.Sprite(
-      new THREE.SpriteMaterial({
-        map: iconTexture,
-        transparent: true,
-        depthWrite: false,
-        opacity,
-      })
-    );
-    sprite.scale.set(size, size, 1);
-    return sprite;
-  }
+  function makeIconSprite(node: any, size = 14, opacity = 1) {
+  const style = getNodeStyle(node);
+
+  const sprite = new THREE.Sprite(
+    new THREE.SpriteMaterial({
+      map: getTexture(style.icon),
+      transparent: true,
+      depthWrite: false,
+      opacity,
+    })
+  );
+
+  sprite.scale.set(size, size, 1);
+  return sprite;
+}
 
   function makeRing(color: string, opacity = 1) {
     const ring = new THREE.Mesh(
@@ -233,7 +254,7 @@ let availableMacroAreas: string[] = [];
     ctx.font = L.font;
     canvas.width = ctx.measureText(text).width + 20;
     canvas.height = 36;
-    ctx.font = "26px sans-serif";
+    ctx.font = GRAPH_CONFIG.node.label.font;
     ctx.fillStyle = "white";
     ctx.fillText(text, 10, 26);
 
@@ -255,7 +276,7 @@ let availableMacroAreas: string[] = [];
   function makeNodeObject(node: any) {
     const group = new THREE.Group();
     const o = opacityForNode(node.id);
-    group.add(makeIconSprite(GRAPH_CONFIG.node.iconSize, o));
+    group.add(makeIconSprite(node,GRAPH_CONFIG.node.iconSize, o));
     group.add(makeRing(colorAccessor(node), o));
     const label = makeLabel(node.label, Math.max(0.18, o));
     const L = GRAPH_CONFIG.node.label;
@@ -306,7 +327,11 @@ let availableMacroAreas: string[] = [];
   const links: any[] = [];
 
   graph.forEachNode((id, attrs) => {
-    nodes.push({ id, label: attrs.label });
+    nodes.push({
+  id,
+  label: attrs.label,
+  type: personDetailsMap.has(id) ? "person" : "place"
+});
   });
 
   graph.forEachEdge((_, __, s, t) => {

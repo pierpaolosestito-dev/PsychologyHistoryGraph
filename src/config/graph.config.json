@@ -38,5 +38,29 @@
 
   "timeline": {
     "debounceMs": 140
+  },
+
+  "nodeTypes": {
+    "default": {
+      "color": "#334155",
+      "icon": "icon.png"
+    },
+
+    "person": {
+      "color": "#38bdf8",
+      "icon": "person.png"
+    },
+
+    "place": {
+      "color": "#22c55e",
+      "icon": "place.png"
+    },
+
+    "highlight": {
+      "root": "#facc15",
+      "neighbor": "#60a5fa",
+      "preview": "#7dd3fc",
+      "clique": "#7dd3fc"
+    }
   }
 }
