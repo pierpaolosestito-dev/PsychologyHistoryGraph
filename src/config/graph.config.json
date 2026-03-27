@@ -1,0 +1,42 @@
+{
+  "graph": {
+    "backgroundColor": "#050816",
+    "nodeOpacity": 0.95,
+    "linkOpacity": 0.4,
+    "linkWidth": 0.4
+  },
+
+  "forces": {
+    "charge": -60,
+    "linkDistance": 70,
+    "linkStrength": 0.5
+  },
+
+  "colors": {
+    "root": "#facc15",
+    "neighbor": "#60a5fa",
+    "preview": "#7dd3fc",
+    "default": "#334155",
+    "clique": "#7dd3fc"
+  },
+
+  "node": {
+    "icon": "icon.png",
+    "iconSize": 14,
+    "ring": {
+      "innerRadius": 0.65,
+      "outerRadius": 0.85,
+      "segments": 32,
+      "scale": 8
+    },
+    "label": {
+      "font": "26px sans-serif",
+      "scale": [18, 8],
+      "offsetY": -10
+    }
+  },
+
+  "timeline": {
+    "debounceMs": 140
+  }
+}

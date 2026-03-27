@@ -4,6 +4,7 @@
   import Graph from "graphology";
   import * as THREE from "three";
   import { forceManyBody, forceCenter, forceLink } from "d3-force-3d";
+  import GRAPH_CONFIG from "./config/graph.config.json"
   import TimelineSlider from "./components/TimelineSlider.svelte";
   import {
   loadDetails,
@@ -169,13 +170,14 @@ let availableMacroAreas: string[] = [];
     return `hsl(${Math.abs(hash) % 360}, 70%, 55%)`;
   }
 
+  const C = GRAPH_CONFIG.colors;
   const colorAccessor = (n: any) => {
-    if (cliqueNodes.has(n.id)) return "#7dd3fc";
+    if (cliqueNodes.has(n.id)) return C.clique;
     if (!selectedId) return colorFromString(n.id);
-    if (n.id === selectedId) return "#facc15";
-    if (highlightedNeighbors.has(n.id)) return "#7dd3fc";
-    if (neighborMap.get(selectedId)?.has(n.id)) return "#60a5fa";
-    return "#334155";
+    if (n.id === selectedId) return C.root;
+    if (highlightedNeighbors.has(n.id)) return C.preview;
+    if (neighborMap.get(selectedId)?.has(n.id)) return C.neighbor;
+    return C.default;
   };
 
   function opacityForNode(nodeId: string) {
@@ -189,9 +191,10 @@ let availableMacroAreas: string[] = [];
 
   // ---------------- ICON + RING ----------------
   const textureLoader = new THREE.TextureLoader();
-  const iconTexture = textureLoader.load("icon.png");
+  const iconTexture = textureLoader.load(GRAPH_CONFIG.node.icon);
   iconTexture.colorSpace = THREE.SRGBColorSpace;
-  const ringGeometry = new THREE.RingGeometry(0.65, 0.85, 32);
+  const R = GRAPH_CONFIG.node.ring;
+  const ringGeometry = new THREE.RingGeometry(R.innerRadius, R.outerRadius, R.segments);
 
   function makeIconSprite(size = 14, opacity = 1) {
     const sprite = new THREE.Sprite(
@@ -218,14 +221,16 @@ let availableMacroAreas: string[] = [];
       })
     );
     ring.rotation.x = Math.PI / 2;
-    ring.scale.set(8, 8, 8);
+    const s = GRAPH_CONFIG.node.ring.scale;
+    ring.scale.set(s, s, s);
     return ring;
   }
 
   function makeLabel(text: string, opacity = 1) {
     const canvas = document.createElement("canvas");
     const ctx = canvas.getContext("2d")!;
-    ctx.font = "26px sans-serif";
+    const L = GRAPH_CONFIG.node.label;
+    ctx.font = L.font;
     canvas.width = ctx.measureText(text).width + 20;
     canvas.height = 36;
     ctx.font = "26px sans-serif";
@@ -243,17 +248,18 @@ let availableMacroAreas: string[] = [];
         opacity,
       })
     );
-    sprite.scale.set(18, 8, 1);
+    sprite.scale.set(L.scale[0], L.scale[1], 1);
     return sprite;
   }
 
   function makeNodeObject(node: any) {
     const group = new THREE.Group();
     const o = opacityForNode(node.id);
-    group.add(makeIconSprite(14, o));
+    group.add(makeIconSprite(GRAPH_CONFIG.node.iconSize, o));
     group.add(makeRing(colorAccessor(node), o));
     const label = makeLabel(node.label, Math.max(0.18, o));
-    label.position.y = -10;
+    const L = GRAPH_CONFIG.node.label;
+    label.position.y = L.offsetY;
     group.add(label);
     return group;
   }
@@ -798,10 +804,10 @@ onMount(() => {
     graph3D = ForceGraph3D()(container)
       .nodeId("id")
       .nodeLabel("label")
-      .backgroundColor("#050816")
-      .nodeOpacity(0.95)
-      .linkOpacity(0.4)
-      .linkWidth(0.4);
+      .backgroundColor(GRAPH_CONFIG.graph.backgroundColor)
+.nodeOpacity(GRAPH_CONFIG.graph.nodeOpacity)
+.linkOpacity(GRAPH_CONFIG.graph.linkOpacity)
+.linkWidth(GRAPH_CONFIG.graph.linkWidth)
 
     graph3D.nodeThreeObjectExtend(false);
     graph3D.nodeThreeObject((node: any) => makeNodeObject(node));
@@ -818,11 +824,12 @@ onMount(() => {
       refreshNodeVisuals();
     });
 
+    const F = GRAPH_CONFIG.forces;
     graph3D
       .forceEngine("d3")
-      .d3Force("charge", forceManyBody().strength(-60))
+      .d3Force("charge", forceManyBody().strength(F.charge))
       .d3Force("center", forceCenter())
-      .d3Force("link", forceLink().distance(70).strength(0.5));
+      .d3Force("link", forceLink().distance(F.linkDistance).strength(F.linkStrength));
 
     loadDataset(datasetMode);
 
@@ -926,7 +933,7 @@ onMount(() => {
     timelineTimeout = setTimeout(() => {
       applyTimelineFilter();
       graph3D?.d3ReheatSimulation?.();
-    }, 140);
+    }, GRAPH_CONFIG.timeline.debounceMs);
   }}
 />
 <SolverPanel
