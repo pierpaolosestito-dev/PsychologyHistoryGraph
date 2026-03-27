@@ -3,8 +3,8 @@
 
   const dispatch = createEventDispatcher();
 
-  export let min = 1776;
-  export let max = 2017;
+  export let min:number;
+  export let max:number;
 
   // ✅ controllati dal parent (App.svelte)
   export let start = min;

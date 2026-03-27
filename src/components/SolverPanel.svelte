@@ -1,5 +1,6 @@
 <script lang="ts">
   import { createEventDispatcher } from "svelte";
+  import GRAPH_CONFIG from "../config/graph.config.json";
 
   export let open: boolean = false;
 
@@ -28,6 +29,10 @@
   export let availableMacroAreas: string[] = [];
 
   const dispatch = createEventDispatcher();
+
+  // ---------------- CONFIG ----------------
+  const SOLVER_CFG = GRAPH_CONFIG.solver ?? {};
+  const F = SOLVER_CFG.features ?? {};
 
   let showOnlyMaximum = false;
   let showAll = false;
@@ -135,6 +140,7 @@
   </div>
 
   <!-- META -->
+  {#if F.stats !== false}
   <div class="solver-meta">
     <div><strong>Total cliques:</strong> {stats?.totalCliques}</div>
     <div><strong>Maximum size:</strong> {stats?.maxSize}</div>
@@ -155,8 +161,9 @@
       <div><strong>Period:</strong> {stats.periodLabel}</div>
     {/if}
   </div>
+  {/if}
 
-  {#if selectedNodeId}
+  {#if F.selectedAnalysis !== false && selectedNodeId}
   <div class="selected-analysis">
     <div><strong>Selected node:</strong> {selectedNodeId}</div>
     <div><strong>Cliques containing it:</strong> {selectedCliqueCount}</div>
@@ -170,6 +177,7 @@
   <!-- CONTROLS -->
   <div class="solver-controls">
 
+    {#if F.macroFilter !== false}
     <label>
       Macro Area
       <select bind:value={selectedMacroArea}>
@@ -179,41 +187,53 @@
         {/each}
       </select>
     </label>
+    {/if}
 
+    {#if F.minSize !== false}
     <label>
       Min clique size
       <input type="number" bind:value={minSize} min="2" />
     </label>
+    {/if}
 
+    {#if F.topPerSize !== false}
     <label>
       Top per size
       <input type="number" bind:value={topPerSize} min="1" max="50" />
     </label>
+    {/if}
 
+    {#if F.onlyMaximum !== false}
     <label>
       <input type="checkbox" bind:checked={showOnlyMaximum} />
       Only maximum cliques
     </label>
+    {/if}
 
+    {#if F.showAll !== false}
     <label>
       <input type="checkbox" bind:checked={showAll} />
       Show all (no top limit)
     </label>
+    {/if}
 
-    {#if selectedNodeId}
+    {#if F.filterBySelectedNode !== false && selectedNodeId}
     <label>
       <input type="checkbox" bind:checked={filterBySelectedNode} />
       Only cliques containing "{selectedNodeId}"
     </label>
     {/if}
 
+    {#if F.downloadCSV !== false}
     <button on:click={downloadCSV}>
       Download CSV (filtered)
     </button>
+    {/if}
 
   </div>
 
   <!-- HISTOGRAM -->
+  {#if F.histogram !== false}
   <div class="solver-histogram">
     <h4>Distribution by size</h4>
     {#if stats?.histogram}
@@ -224,6 +244,7 @@
       {/each}
     {/if}
   </div>
+  {/if}
 
   <!-- CLIQUES -->
   <div class="solver-cliques">

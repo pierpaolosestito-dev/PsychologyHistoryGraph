@@ -36,9 +36,76 @@
     }
   },
 
-  "timeline": {
-    "debounceMs": 140
+  "features": {
+    "filters": false,
+    "timeline": false
   },
+
+  "timeline": {
+    "debounceMs": 140,
+    "start":1776,
+    "end":2017
+  },
+
+  "solver": {
+  "enabled": true,
+  "features": {
+    "macroFilter": true,
+    "minSize": true,
+    "topPerSize": true,
+    "onlyMaximum": true,
+    "showAll": true,
+    "filterBySelectedNode": true,
+    "downloadCSV": true,
+    "histogram": true,
+    "stats": true,
+    "selectedAnalysis": true
+  }
+},
+  
+  "ui": {
+    "toolbar": {
+      "icon": {
+        "src": "/icon.png",
+        "width": 28,
+        "height": 28,
+        "marginRight": 6
+      },
+      "spacing": 8,
+      "padding": "8px 10px",
+      "borderRadius": 8,
+      "top": 10,
+      "left": 10
+    },
+
+    "search": {
+      "width": 320,
+      "maxWidth": "56vw"
+    },
+
+    "zoom": {
+      "gap": 4
+    },
+
+    "filterCard": {
+      "top": 64,
+      "left": 10,
+      "padding": 10,
+      "borderRadius": 8,
+      "fontSize": 13
+    },
+
+    "autocomplete": {
+      "itemPadding": "6px 10px",
+      "fontSize": 13
+    }
+  },
+
+  "filters": {
+  "enabled": true,
+  "types": true,
+  "macroAreas": true
+},
 
   "nodeTypes": {
     "default": {
