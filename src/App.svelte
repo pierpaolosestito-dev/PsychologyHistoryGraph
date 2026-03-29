@@ -89,30 +89,14 @@
   }
 
   function buildUiDetails(node: any) {
-    if (!node) return null;
+  if (!node) return null;
 
-    if (node.type === "person") {
-      return {
-        tipo: "person",
-        nome: node.label,
-        ...node.data
-      };
-    }
-
-    if (node.type === "place") {
-      return {
-        tipo: "place",
-        titolo: node.label,
-        ...node.data
-      };
-    }
-
-    return {
-      tipo: node.type ?? "unknown",
-      titolo: node.label,
-      ...node.data
-    };
-  }
+  return {
+    tipo: node.type ?? "unknown",
+    titolo: node.label,
+    ...node.data
+  };
+}
 
   function updateSelectedDetails(id: string) {
     const node = getNodeById(id);
@@ -131,13 +115,11 @@
     const macroSet = new Set<string>();
 
     for (const node of originalData.nodes) {
-      if (node.type) typeSet.add(node.type);
+  if (node.type) typeSet.add(node.type);
 
-      const roles = node.data?.roles ?? [];
-      for (const role of roles) {
-        if (role?.macro_area) macroSet.add(role.macro_area);
-      }
-    }
+  const macros = extractMacroAreas(node);
+  macros.forEach(m => macroSet.add(m));
+}
 
     availableTypes = Array.from(typeSet).sort();
     availableMacroAreas = Array.from(macroSet).sort();
@@ -148,84 +130,82 @@
     return selectedTypes.has(node.type);
   }
 
-  function nodePassesMacroFilters(node: any) {
-    if (!macroFiltersEnabled || selectedMacroAreasFilter.size === 0) return true;
-    const roles = node.data?.roles ?? [];
-    return roles.some((r: any) => r?.macro_area && selectedMacroAreasFilter.has(r.macro_area));
+  function extractMacroAreas(node: any): string[] {
+  const config = GRAPH_CONFIG.nodeTypes?.[node.type];
+
+  if (!config?.macroAreaField) return [];
+
+  if (config.macroAreaField === "roles[].macro_area") {
+    return (node.data?.roles ?? [])
+      .map((r: any) => r?.macro_area)
+      .filter(Boolean);
   }
+
+  return [];
+}
+
+  function nodePassesMacroFilters(node: any) {
+  if (!macroFiltersEnabled || selectedMacroAreasFilter.size === 0) return true;
+
+  return extractMacroAreas(node).some((m) =>
+    selectedMacroAreasFilter.has(m)
+  );
+}
 
   function nodePassesTimeline(node: any) {
-    if (node.type !== "person") return false;
+  const config = GRAPH_CONFIG.nodeTypes?.[node.type];
 
-    const birth = node.data?.anno_nascita ?? 0;
-    const death = node.data?.anno_morte ?? 9999;
+  if (!config || !config.timeline) return true;
 
-    return birth <= currentEnd && death >= currentStart;
+  const start = node.data?.[config.timeline.startField] ?? 0;
+  const end = node.data?.[config.timeline.endField] ?? 9999;
+
+  return start <= currentEnd && end >= currentStart;
+}
+
+ function recomputeGraphData() {
+  if (!originalData) return;
+
+  const visibleNodes = new Set<string>();
+
+  // STEP 1: applica filtri veri
+  for (const node of originalData.nodes) {
+    if (!nodePassesTypeFilters(node)) continue;
+    if (!nodePassesMacroFilters(node)) continue;
+    if (!nodePassesTimeline(node)) continue;
+
+    visibleNodes.add(node.id);
   }
 
-  function recomputeGraphData() {
-    if (!originalData) return;
+  // STEP 2: mantieni SOLO link tra nodi visibili
+  const filteredLinks = originalData.links.filter((l: any) => {
+    const s = getLinkEndId(l.source);
+    const t = getLinkEndId(l.target);
+    return visibleNodes.has(s) && visibleNodes.has(t);
+  });
 
-    const visiblePersons = new Set<string>();
+  const filteredNodes = originalData.nodes.filter((n: any) =>
+    visibleNodes.has(n.id)
+  );
 
-    for (const node of originalData.nodes) {
-      if (!nodePassesTypeFilters(node)) continue;
-      if (!nodePassesMacroFilters(node)) continue;
-      if (!nodePassesTimeline(node)) continue;
+  data = {
+    nodes: filteredNodes,
+    links: filteredLinks
+  };
 
-      visiblePersons.add(node.id);
-    }
+  buildNeighborMap();
 
-    const visiblePlaces = new Set<string>();
-
-    for (const link of originalData.links) {
-      const sourceId = getLinkEndId(link.source);
-      const targetId = getLinkEndId(link.target);
-
-      const sourceNode = getNodeById(sourceId, originalData.nodes);
-      const targetNode = getNodeById(targetId, originalData.nodes);
-
-      if (visiblePersons.has(sourceId) && targetNode?.type !== "person") {
-        if (nodePassesTypeFilters(targetNode) && nodePassesMacroFilters(targetNode)) {
-          visiblePlaces.add(targetId);
-        }
-      }
-
-      if (visiblePersons.has(targetId) && sourceNode?.type !== "person") {
-        if (nodePassesTypeFilters(sourceNode) && nodePassesMacroFilters(sourceNode)) {
-          visiblePlaces.add(sourceId);
-        }
-      }
-    }
-
-    const visibleNodes = new Set<string>([...visiblePersons, ...visiblePlaces]);
-
-    const filteredNodes = originalData.nodes.filter((n: any) => visibleNodes.has(n.id));
-
-    const filteredLinks = originalData.links.filter((l: any) => {
-      const sourceId = getLinkEndId(l.source);
-      const targetId = getLinkEndId(l.target);
-      return visibleNodes.has(sourceId) && visibleNodes.has(targetId);
-    });
-
-    data = {
-      nodes: filteredNodes,
-      links: filteredLinks
-    };
-
-    buildNeighborMap();
-
-    if (selectedId && !visibleNodes.has(selectedId)) {
-      selectedId = null;
-      rootSelectedId = null;
-      selectedNode = null;
-      selectedDetails = null;
-      highlightedNeighbors = new Set();
-    }
-
-    graph3D.graphData(data);
-    refreshNodeVisuals();
+  if (selectedId && !visibleNodes.has(selectedId)) {
+    selectedId = null;
+    rootSelectedId = null;
+    selectedNode = null;
+    selectedDetails = null;
+    highlightedNeighbors = new Set();
   }
+
+  graph3D.graphData(data);
+  refreshNodeVisuals();
+}
 
   function loadDataset() {
     currentStart = GRAPH_CONFIG.timeline.start;
@@ -262,6 +242,8 @@
 
   // ---------------- HISTORY ----------------
   let history: string[] = [];
+
+  
 
   function startHistory(id: string) {
     history = [id];
@@ -647,55 +629,57 @@ valid(V) :- node(V), macro(V, ${macroAtom}).
 `;
 
   function buildAspFactsFromCurrentData() {
-    if (!data) return { facts: "", reverseIndex: {} };
+  if (!data) return { facts: "", reverseIndex: {} };
 
-    const indexMap = new Map<string, number>();
-    const reverseIndex: Record<number, string> = {};
+  const indexMap = new Map<string, number>();
+  const reverseIndex: Record<number, string> = {};
 
-    let counter = 1;
+  let counter = 1;
 
-    for (const node of data.nodes) {
-      indexMap.set(node.id, counter);
-      reverseIndex[counter] = node.id;
-      counter++;
-    }
-
-    let facts = "";
-
-    for (const [, idx] of indexMap) {
-      facts += `node(${idx}).\n`;
-    }
-
-    for (const node of data.nodes) {
-      const details = node.data;
-      if (node.type !== "person" || !details?.roles) continue;
-
-      const idx = indexMap.get(node.id);
-      if (!idx) continue;
-
-      for (const role of details.roles) {
-        if (role?.macro_area) {
-          const atom = atomize(role.macro_area);
-          facts += `macro(${idx},${atom}).\n`;
-        }
-      }
-    }
-
-    for (const link of data.links) {
-      const sourceId = getLinkEndId(link.source);
-      const targetId = getLinkEndId(link.target);
-
-      const s = indexMap.get(sourceId);
-      const t = indexMap.get(targetId);
-
-      if (s && t) {
-        facts += `edge(${s},${t}).\n`;
-        facts += `edge(${t},${s}).\n`;
-      }
-    }
-
-    return { facts, reverseIndex };
+  // ---------------- NODE INDEX ----------------
+  for (const node of data.nodes) {
+    indexMap.set(node.id, counter);
+    reverseIndex[counter] = node.id;
+    counter++;
   }
+
+  let facts = "";
+
+  // ---------------- NODE FACTS ----------------
+  for (const [, idx] of indexMap) {
+    facts += `node(${idx}).\n`;
+  }
+
+  // ---------------- MACRO FACTS (GENERIC) ----------------
+  for (const node of data.nodes) {
+    const idx = indexMap.get(node.id);
+    if (!idx) continue;
+
+    const macroAreas = extractMacroAreas(node);
+    if (!macroAreas.length) continue;
+
+    for (const macro of macroAreas) {
+      const atom = atomize(macro);
+      facts += `macro(${idx},${atom}).\n`;
+    }
+  }
+
+  // ---------------- EDGE FACTS ----------------
+  for (const link of data.links) {
+    const sourceId = getLinkEndId(link.source);
+    const targetId = getLinkEndId(link.target);
+
+    const s = indexMap.get(sourceId);
+    const t = indexMap.get(targetId);
+
+    if (s && t) {
+      facts += `edge(${s},${t}).\n`;
+      facts += `edge(${t},${s}).\n`;
+    }
+  }
+
+  return { facts, reverseIndex };
+}
 
   async function runMaximumClique() {
     console.log("🔵 [CLIQUE] Starting computation on FILTERED graph...");
@@ -804,7 +788,7 @@ valid(V) :- node(V), macro(V, ${macroAtom}).
 
         showSolverPanel = true;
         cliqueNodes = new Set(maxCliques[0]);
-        refreshNodeVisuals();
+        //graph3D.refresh();
 
         console.timeEnd("CLIQUE_TIME");
 
@@ -826,17 +810,14 @@ valid(V) :- node(V), macro(V, ${macroAtom}).
   }
 
   function computeMacroAreas() {
-    const set = new Set<string>();
+  const set = new Set<string>();
 
-    for (const node of originalData?.nodes ?? []) {
-      const roles = node.data?.roles ?? [];
-      roles.forEach((r: any) => {
-        if (r?.macro_area) set.add(r.macro_area);
-      });
-    }
-
-    availableMacroAreas = Array.from(set).sort();
+  for (const node of originalData?.nodes ?? []) {
+    extractMacroAreas(node).forEach(m => set.add(m));
   }
+
+  availableMacroAreas = Array.from(set).sort();
+}
 
   // ---------------- LIFECYCLE ----------------
   onMount(() => {

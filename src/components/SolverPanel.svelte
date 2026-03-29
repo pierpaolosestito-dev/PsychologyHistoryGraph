@@ -20,23 +20,23 @@
 
   export let selectedNodeId: string | null = null;
 
-  // ⚠️ DEVONO RESTARE export per il bind
   export let minSize: number = 3;
   export let topPerSize: number = 5;
 
-  // ---------------- MACRO FILTER ----------------
   export let selectedMacroArea: string | null = null;
   export let availableMacroAreas: string[] = [];
 
   const dispatch = createEventDispatcher();
 
-  // ---------------- CONFIG ----------------
   const SOLVER_CFG = GRAPH_CONFIG.solver ?? {};
   const F = SOLVER_CFG.features ?? {};
 
   let showOnlyMaximum = false;
   let showAll = false;
   let filterBySelectedNode = false;
+
+  let filteredCliques: string[][] = [];
+  let grouped: { size: number; cliques: string[][] }[] = [];
 
   function highlightClique(c: string[]) {
     dispatch("highlight", c);
@@ -71,7 +71,17 @@
     return base as string[][];
   }
 
-  $: filteredCliques = getFilteredCliques();
+  // ✅ FIX REATTIVITÀ
+  $: {
+    allCliques;
+    maximumCliques;
+    selectedNodeId;
+    minSize;
+    showOnlyMaximum;
+    filterBySelectedNode;
+
+    filteredCliques = getFilteredCliques();
+  }
 
   function groupCliques(cliques: string[][]) {
     if (!cliques || !cliques.length) return [];
@@ -97,9 +107,15 @@
     }));
   }
 
-  $: grouped = groupCliques(filteredCliques ?? []);
+  // ✅ FIX REATTIVITÀ
+  $: {
+    filteredCliques;
+    showAll;
+    topPerSize;
 
-  // Analisi nodo selezionato
+    grouped = groupCliques(filteredCliques ?? []);
+  }
+
   $: selectedCliqueCount =
     selectedNodeId
       ? (allCliques ?? []).filter(c => c.includes(selectedNodeId)).length
@@ -139,7 +155,6 @@
     <button class="close-btn" on:click={closePanel}>✕</button>
   </div>
 
-  <!-- META -->
   {#if F.stats !== false}
   <div class="solver-meta">
     <div><strong>Total cliques:</strong> {stats?.totalCliques}</div>
@@ -174,7 +189,6 @@
   </div>
   {/if}
 
-  <!-- CONTROLS -->
   <div class="solver-controls">
 
     {#if F.macroFilter !== false}
@@ -232,21 +246,6 @@
 
   </div>
 
-  <!-- HISTOGRAM -->
-  {#if F.histogram !== false}
-  <div class="solver-histogram">
-    <h4>Distribution by size</h4>
-    {#if stats?.histogram}
-      {#each Array.from(stats.histogram.entries()).sort((a,b)=>b[0]-a[0]) as [size,count]}
-        <div class="hist-line">
-          size {size} → {count}
-        </div>
-      {/each}
-    {/if}
-  </div>
-  {/if}
-
-  <!-- CLIQUES -->
   <div class="solver-cliques">
     <h4>Cliques</h4>
 
