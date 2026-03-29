@@ -1,3 +1,4 @@
+
 <script lang="ts">
   import { onMount, onDestroy } from "svelte";
   import ForceGraph3D from "3d-force-graph";
@@ -68,6 +69,8 @@
   // ---------------- HELPERS ----------------
   function atomize(s: string) {
     return (s ?? "")
+      .trim()
+      .replace(/\s+/g, " ")
       .toLowerCase()
       .replace(/&/g, "")
       .replace(/[^a-z0-9]+/g, "_")
@@ -166,18 +169,76 @@
  function recomputeGraphData() {
   if (!originalData) return;
 
+  const TIMELINE_CFG = GRAPH_CONFIG.timeline ?? {};
+  const mode = TIMELINE_CFG.mode ?? "graph-aware";
+
   const visibleNodes = new Set<string>();
 
-  // STEP 1: applica filtri veri
-  for (const node of originalData.nodes) {
-    if (!nodePassesTypeFilters(node)) continue;
-    if (!nodePassesMacroFilters(node)) continue;
-    if (!nodePassesTimeline(node)) continue;
+  // =========================================================
+  // 🔹 MODE 1: GRAPH-AWARE (timeline intelligente)
+  // =========================================================
+  if (mode === "graph-aware") {
 
-    visibleNodes.add(node.id);
+    const visibleTemporal = new Set<string>();
+
+    // --- STEP 1: nodi temporali (es. person)
+    for (const node of originalData.nodes) {
+      const config = GRAPH_CONFIG.nodeTypes?.[node.type];
+
+      if (!config || config.category !== "temporal") continue;
+      if (!config.timeline) continue;
+
+      const start = node.data?.[config.timeline.startField] ?? 0;
+      const end = node.data?.[config.timeline.endField] ?? 9999;
+
+      if (start <= currentEnd && end >= currentStart) {
+        visibleTemporal.add(node.id);
+      }
+    }
+
+    // --- STEP 2: espansione ai nodi collegati (es. place)
+    const visibleRelated = new Set<string>();
+
+    for (const link of originalData.links) {
+      const s = getLinkEndId(link.source);
+      const t = getLinkEndId(link.target);
+
+      if (visibleTemporal.has(s)) visibleRelated.add(t);
+      if (visibleTemporal.has(t)) visibleRelated.add(s);
+    }
+
+    // --- STEP 3: unione
+    const expanded = new Set<string>([
+      ...visibleTemporal,
+      ...visibleRelated
+    ]);
+
+    // --- STEP 4: applica filtri (type + macro)
+    for (const node of originalData.nodes) {
+      if (!expanded.has(node.id)) continue;
+      if (!nodePassesTypeFilters(node)) continue;
+      if (!nodePassesMacroFilters(node)) continue;
+
+      visibleNodes.add(node.id);
+    }
+
+  } else {
+
+    // =========================================================
+    // 🔹 MODE 2: SIMPLE (fallback vecchio comportamento)
+    // =========================================================
+    for (const node of originalData.nodes) {
+      if (!nodePassesTypeFilters(node)) continue;
+      if (!nodePassesMacroFilters(node)) continue;
+      if (!nodePassesTimeline(node)) continue;
+
+      visibleNodes.add(node.id);
+    }
   }
 
-  // STEP 2: mantieni SOLO link tra nodi visibili
+  // =========================================================
+  // 🔹 LINK FILTERING (coerente)
+  // =========================================================
   const filteredLinks = originalData.links.filter((l: any) => {
     const s = getLinkEndId(l.source);
     const t = getLinkEndId(l.target);
@@ -193,8 +254,14 @@
     links: filteredLinks
   };
 
+  // =========================================================
+  // 🔹 rebuild neighbor map
+  // =========================================================
   buildNeighborMap();
 
+  // =========================================================
+  // 🔹 reset selection se non più valida
+  // =========================================================
   if (selectedId && !visibleNodes.has(selectedId)) {
     selectedId = null;
     rootSelectedId = null;
@@ -203,6 +270,9 @@
     highlightedNeighbors = new Set();
   }
 
+  // =========================================================
+  // 🔹 update graph
+  // =========================================================
   graph3D.graphData(data);
   refreshNodeVisuals();
 }
@@ -222,17 +292,20 @@
     const graph = getUnifiedGraph();
 
     originalData = {
-      nodes: graph.nodes.map((n: any) => ({
-        ...n,
-        label: normalizeName(n.label)
-      })),
-      links: graph.edges.map((e: any) => ({
-        source: e.source,
-        target: e.target,
-        type: e.type
-      }))
+  nodes: graph.nodes.map((n: any) => {
+    const label = normalizeName(n.label);
+    return {
+      ...n,
+      label,
+      id: atomize(label)   // 🔥 FIX CRITICO
     };
-
+  }),
+  links: graph.edges.map((e: any) => ({
+    source: atomize(e.source),
+    target: atomize(e.target),
+    type: e.type
+  }))
+};
     buildSearchIndexFromNodes(originalData.nodes);
     computeDynamicFilters();
     recomputeGraphData();
@@ -245,14 +318,14 @@
 
   
 
-  function startHistory(id: string) {
-    history = [id];
-  }
+  function startHistory(label: string) {
+  history = [label];
+}
 
-  function pushHistory(id: string) {
-    if (history[history.length - 1] === id) return;
-    history = [...history, id];
-  }
+ function pushHistory(label: string) {
+  if (history[history.length - 1] === label) return;
+  history = [...history, label];
+}
 
   function truncateHistoryTo(id: string) {
     const idx = history.lastIndexOf(id);
@@ -349,16 +422,29 @@
   const textureCache = new Map<string, THREE.Texture>();
 
   function getTexture(path: string) {
-    const safePath = path || GRAPH_CONFIG.node.icon;
+  if (!path) return null;
 
-    if (!textureCache.has(safePath)) {
-      const tex = textureLoader.load(safePath);
-      tex.colorSpace = THREE.SRGBColorSpace;
-      textureCache.set(safePath, tex);
-    }
+  const safePath = path.startsWith("/") ? path : "/" + path;
 
-    return textureCache.get(safePath)!;
+  if (!textureCache.has(safePath)) {
+    const tex = textureLoader.load(
+      safePath,
+      () => {
+        // 🔥 quando la texture è pronta → refresh nodi
+        refreshNodeVisuals();
+      },
+      undefined,
+      () => {
+        console.warn("❌ Texture non trovata:", safePath);
+      }
+    );
+
+    tex.colorSpace = THREE.SRGBColorSpace;
+    textureCache.set(safePath, tex);
   }
+
+  return textureCache.get(safePath);
+}
 
   const R = GRAPH_CONFIG.node.ring;
   const ringGeometry = new THREE.RingGeometry(R.innerRadius, R.outerRadius, R.segments);
@@ -426,19 +512,39 @@
   }
 
   function makeNodeObject(node: any) {
-    const group = new THREE.Group();
-    const o = opacityForNode(node.id);
+  const group = new THREE.Group();
+  const o = opacityForNode(node.id);
 
+  const style = getNodeStyle(node);
+  const tex = getTexture(style.icon);
+
+  // 🔹 ICONA se disponibile
+  if (tex) {
     group.add(makeIconSprite(node, GRAPH_CONFIG.node.iconSize, o));
-    group.add(makeRing(colorAccessor(node), o));
-
-    const label = makeLabel(node.label, Math.max(0.18, o));
-    const L = GRAPH_CONFIG.node.label;
-    label.position.y = L.offsetY;
-    group.add(label);
-
-    return group;
+  } else {
+    // 🔥 fallback stabile
+    const sphere = new THREE.Mesh(
+      new THREE.SphereGeometry(2.5, 16, 16),
+      new THREE.MeshBasicMaterial({
+        color: colorAccessor(node),
+        transparent: true,
+        opacity: o
+      })
+    );
+    group.add(sphere);
   }
+
+  // 🔹 ring sempre
+  group.add(makeRing(colorAccessor(node), o));
+
+  // 🔹 label
+  const label = makeLabel(node.label, Math.max(0.18, o));
+  const L = GRAPH_CONFIG.node.label;
+  label.position.y = L.offsetY;
+  group.add(label);
+
+  return group;
+}
 
   function refreshNodeVisuals() {
     graph3D.nodeThreeObject((node: any) => makeNodeObject(node));
@@ -494,16 +600,30 @@
   }
 
   // ---------------- INTERACTIONS ----------------
+  
   function focusNode(id: string) {
-    const node = data.nodes.find((n: any) => n.id === id);
-    if (!node || node.x == null) return;
+  const node = data.nodes.find((n: any) => n.id === id);
 
-    graph3D.cameraPosition(
-      { x: node.x * 2, y: node.y * 2, z: node.z * 2 + 40 },
-      { x: node.x, y: node.y, z: node.z },
-      900
-    );
+  console.log("🎯 FOCUS NODE:", node);
+
+  if (!node) {
+    console.warn("❌ Nodo non presente nel grafo filtrato");
+    return;
   }
+
+  console.log("📍 POS:", node.x, node.y, node.z);
+
+  if (node.x == null) {
+    console.warn("❌ Nodo SENZA coordinate (simulation non pronta)");
+    return;
+  }
+
+  graph3D.cameraPosition(
+    { x: node.x * 2, y: node.y * 2, z: node.z * 2 + 40 },
+    { x: node.x, y: node.y, z: node.z },
+    900
+  );
+}
 
   function selectNode(id: string) {
     const node = data.nodes.find((n: any) => n.id === id);
@@ -544,21 +664,47 @@
     refreshNodeVisuals();
   }
 
-  function searchNode(q: string) {
-    const text = q.trim().toLowerCase();
-    if (!text) return;
+function searchNode(q: string) {
+  const text = q.trim().toLowerCase();
+  if (!text) return;
 
-    const node = data.nodes.find((n: any) => n.label.toLowerCase().includes(text));
-    if (!node) return;
+  console.log("🔍 SEARCH:", text);
 
-    rootSelectedId = node.id;
-    selectedId = node.id;
-    highlightedNeighbors = new Set();
-    startHistory(node.id);
-    focusNode(node.id);
-    selectNode(node.id);
-    refreshNodeVisuals();
+  const node = originalData.nodes.find((n: any) =>
+    n.label.toLowerCase().includes(text)
+  );
+
+  console.log("🔍 FOUND NODE:", node);
+
+  if (!node) {
+    console.warn("❌ Nodo non trovato");
+    return;
   }
+
+  const id = node.id;
+
+  console.log("🧠 ID:", id);
+
+  rootSelectedId = id;
+  selectedId = id;
+  highlightedNeighbors = new Set();
+
+  startHistory(node.label);
+
+  const isVisible = data.nodes.find((n: any) => n.id === id);
+  console.log("👁️ VISIBILE PRIMA?", !!isVisible);
+
+  if (!isVisible) {
+    console.log("♻️ RECOMPUTE GRAPH...");
+    recomputeGraphData();
+  }
+
+  console.log("📊 NODO DOPO FILTER:", data.nodes.find(n => n.id === id));
+
+  focusNode(id);
+  selectNode(id);
+  refreshNodeVisuals();
+}
 
   function resetView() {
     rootSelectedId = null;
@@ -850,7 +996,7 @@ valid(V) :- node(V), macro(V, ${macroAtom}).
         selectedId = node.id;
         highlightedNeighbors = new Set();
         showSuggestions = false;
-        startHistory(node.id);
+        startHistory(node.label);
         focusNode(node.id);
         selectNode(node.id);
         updateSelectedDetails(node.id);
@@ -1104,7 +1250,16 @@ valid(V) :- node(V), macro(V, ${macroAtom}).
   {selectedNode}
   {selectedDetails}
   {rootSelectedId}
-  neighborIds={Array.from(neighborMap.get(rootSelectedId ?? "") ?? [])}
+  neighborIds={
+  Array.from(neighborMap.get(rootSelectedId ?? "") ?? [])
+    .map(id => {
+      const node = getNodeById(id);
+      return {
+        id,
+        label: node?.label ?? id
+      };
+    })
+}
   {highlightedNeighbors}
   onBackToRoot={backToRoot}
   onViewNeighbor={viewNeighbor}

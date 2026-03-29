@@ -1,11 +1,16 @@
 <script lang="ts">
   import type { NodeDetails } from "../data/details";
 
+  type Neighbor = {
+    id: string;
+    label: string;
+  };
+
   // Props dal parent
   export let selectedNode: any = null;
   export let selectedDetails: NodeDetails | null = null;
   export let rootSelectedId: string | null = null;
-  export let neighborIds: string[] = [];
+  export let neighborIds: Neighbor[] = [];
   export let highlightedNeighbors: Set<string> = new Set();
 
   export let onBackToRoot: () => void;
@@ -47,25 +52,25 @@
 
     <strong>Neighbors:</strong>
     <ul>
-      {#each neighborIds as nid}
+      {#each neighborIds as n}
         <li style="display:flex; align-items:center; gap:6px;">
           <label style="flex:1; display:flex; align-items:center; gap:6px;">
             <input
               type="checkbox"
-              checked={highlightedNeighbors.has(nid)}
+              checked={highlightedNeighbors.has(n.id)}
               on:change={(e) => {
                 const checked = (e.currentTarget as HTMLInputElement).checked;
-                if (checked) onViewNeighbor(nid);
+                if (checked) onViewNeighbor(n.id);
                 else onBackToRoot();
               }}
             />
-            {nid}
+            {n.label}
           </label>
 
           <button
             title="Esplora questo nodo"
             type="button"
-            on:click={() => onCommitNeighbor(nid)}
+            on:click={() => onCommitNeighbor(n.id)}
             class="explore-btn"
           >
             →
@@ -113,7 +118,6 @@
                 <p><strong>Periodo:</strong> {selectedDetails.periodo}</p>
               {/if}
 
-              <!-- NUOVA SEZIONE: MACRO AREE -->
               {#if selectedDetails.roles && selectedDetails.roles.length > 0}
                 <hr />
                 <p><strong>Ambiti professionali:</strong></p>

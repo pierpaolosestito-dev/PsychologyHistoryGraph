@@ -12,10 +12,10 @@
     </div>
 
     <div class="crumbs">
-      {#each history as id, i}
-        <button class="crumb" type="button" on:click={() => onJumpTo(id)}>
-          {id}
-        </button>
+      {#each history as label, i}
+  <button class="crumb" type="button" on:click={() => onJumpTo(label)}>
+    {label}
+  </button>
         {#if i < history.length - 1}
           <span class="sep">→</span>
         {/if}
