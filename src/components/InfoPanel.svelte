@@ -189,15 +189,15 @@
 <style>
   .info-panel {
     position: absolute;
-    top: 10px;
-    right: 10px;
-    width: 260px;
-    max-height: 340px;
+    top: var(--info-top);
+    right: var(--info-right);
+    width: var(--info-width);
+    max-height: var(--info-max-height);
     overflow-y: auto;
-    background: rgba(15, 23, 42, 0.85);
-    padding: 12px;
-    border-radius: 8px;
-    z-index: 10;
+    background: var(--info-bg);
+    padding: var(--info-padding);
+    border-radius: var(--info-radius);
+    z-index: var(--info-z);
   }
 
   .title-btn {
@@ -213,15 +213,15 @@
 
   .title-btn h3 {
     margin: 0;
-    font-size: 16px;
+    font-size: var(--info-title-size);
     text-decoration: underline;
   }
 
   .modal-backdrop {
     position: fixed;
     inset: 0;
-    background: rgba(2, 6, 23, 0.7);
-    z-index: 999;
+    background: var(--modal-backdrop);
+    z-index: var(--modal-z);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -229,24 +229,24 @@
   }
 
   .modal-card {
-    width: min(720px, 92vw);
-    max-height: 85vh;
+    width: var(--modal-card-width);
+    max-height: var(--modal-card-max-height);
     overflow-y: auto;
-    background: rgba(15, 23, 42, 0.98);
-    border-radius: 12px;
+    background: var(--modal-card-bg);
+    border-radius: var(--modal-card-radius);
     padding-bottom: 20px;
   }
 
   .modal-header {
     padding: 16px;
-    font-size: 20px;
+    font-size: var(--modal-header-size);
     font-weight: 600;
-    border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+    border-bottom: var(--modal-header-border);
   }
 
   .modal-body {
-    padding: 16px;
-    line-height: 1.6;
+    padding: var(--modal-body-padding);
+    line-height: var(--modal-line-height);
   }
 
   .biografia {
@@ -262,13 +262,13 @@
   .modal-footer {
     display: flex;
     justify-content: flex-end;
-    padding: 12px 16px;
+    padding: var(--modal-footer-padding);
   }
 
   .modal-close {
     border: none;
-    background: rgba(255, 255, 255, 0.08);
-    color: #e2e8f0;
+    background: var(--modal-close-bg);
+    color: var(--modal-close-color);
     border-radius: 8px;
     width: 36px;
     height: 36px;

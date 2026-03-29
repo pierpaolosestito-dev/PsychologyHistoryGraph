@@ -27,59 +27,59 @@
 <style>
   .history-panel {
     position: absolute;
-    left: 10px;
-    bottom: 10px;
-    max-width: min(560px, 92vw);
-    background: rgba(15, 23, 42, 0.85);
-    border-radius: 8px;
-    padding: 10px;
-    z-index: 15;
-    font-size: 13px;
-    color: #e2e8f0;
+    left: var(--history-left);
+    bottom: var(--history-bottom);
+    max-width: var(--history-max-width);
+    background: var(--history-bg);
+    border-radius: var(--history-radius);
+    padding: var(--history-padding);
+    z-index: var(--history-z);
+    font-size: var(--history-font);
+    color: var(--history-color);
   }
 
   .history-head {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 8px;
+    margin-bottom: var(--history-header-mb);
   }
 
   .clear-btn {
     border: none;
-    background: rgba(255,255,255,0.08);
+    background: var(--history-clear-bg);
     color: inherit;
-    border-radius: 6px;
-    width: 28px;
-    height: 28px;
+    border-radius: var(--history-clear-radius);
+    width: var(--history-clear-size);
+    height: var(--history-clear-size);
     cursor: pointer;
   }
 
   .crumbs {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: var(--history-gap);
     align-items: center;
   }
 
   .crumb {
     border: none;
-    background: rgba(56, 189, 248, 0.12);
+    background: var(--history-crumb-bg);
     color: inherit;
-    border-radius: 999px;
-    padding: 4px 8px;
+    border-radius: var(--history-crumb-radius);
+    padding: var(--history-crumb-padding);
     cursor: pointer;
     white-space: nowrap;
-    max-width: 220px;
+    max-width: var(--history-crumb-max);
     overflow: hidden;
     text-overflow: ellipsis;
   }
 
   .crumb:hover {
-    background: rgba(56, 189, 248, 0.22);
+    background: var(--history-crumb-hover);
   }
 
   .sep {
-    opacity: 0.6;
+    opacity: var(--history-sep-opacity);
   }
 </style>

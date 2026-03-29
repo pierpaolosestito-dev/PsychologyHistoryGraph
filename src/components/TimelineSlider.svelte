@@ -1,6 +1,7 @@
 <script lang="ts">
   import { createEventDispatcher } from "svelte";
-
+  import GRAPH_CONFIG from "../config/graph.config.json"
+  const UI = GRAPH_CONFIG.ui;
   const dispatch = createEventDispatcher();
 
   export let min:number;
@@ -36,7 +37,33 @@
   }
 </script>
 
-<div class="timeline-container">
+<div
+  class="timeline-container"
+  style="
+    --tl-bottom: {UI.timeline.bottom}px;
+    --tl-width: {UI.timeline.width};
+    --tl-padding: {UI.timeline.padding};
+    --tl-radius: {UI.timeline.borderRadius}px;
+    --tl-bg: {UI.timeline.background};
+    --tl-blur: {UI.timeline.blur}px;
+    --tl-shadow: {UI.timeline.shadow};
+    --tl-z: {UI.timeline.zIndex};
+
+    --tl-label-gap: {UI.timeline.label.gap}px;
+    --tl-label-size: {UI.timeline.label.fontSize}px;
+    --tl-label-weight: {UI.timeline.label.fontWeight};
+    --tl-label-mb: {UI.timeline.label.marginBottom}px;
+
+    --tl-slider-height: {UI.timeline.slider.height}px;
+    --tl-track-height: {UI.timeline.slider.trackHeight}px;
+    --tl-track-radius: {UI.timeline.slider.trackRadius}px;
+    --tl-track-color: {UI.timeline.slider.trackColor};
+
+    --tl-thumb-size: {UI.timeline.slider.thumbSize}px;
+    --tl-thumb-color: {UI.timeline.slider.thumbColor};
+    --tl-thumb-border: {UI.timeline.slider.thumbBorder};
+  "
+>
   <div class="timeline-label">
     <span>{localStart}</span>
     <span>—</span>
@@ -67,30 +94,30 @@
 <style>
   .timeline-container {
     position: absolute;
-    bottom: 20px;
+    bottom: var(--tl-bottom);
     left: 50%;
     transform: translateX(-50%);
-    width: min(800px, 90vw);
-    background: rgba(15, 23, 42, 0.85);
-    padding: 16px 24px;
-    border-radius: 16px;
-    backdrop-filter: blur(8px);
-    box-shadow: 0 10px 30px rgba(0,0,0,0.4);
-    z-index: 25;
+    width: var(--tl-width);
+    background: var(--tl-bg);
+    padding: var(--tl-padding);
+    border-radius: var(--tl-radius);
+    backdrop-filter: blur(var(--tl-blur));
+    box-shadow: var(--tl-shadow);
+    z-index: var(--tl-z);
   }
 
   .timeline-label {
     display: flex;
     justify-content: center;
-    gap: 12px;
-    font-size: 18px;
-    font-weight: 600;
-    margin-bottom: 12px;
+    gap: var(--tl-label-gap);
+    font-size: var(--tl-label-size);
+    font-weight: var(--tl-label-weight);
+    margin-bottom: var(--tl-label-mb);
   }
 
   .slider-wrapper {
     position: relative;
-    height: 40px;
+    height: var(--tl-slider-height);
   }
 
   .slider {
@@ -104,17 +131,17 @@
   .slider::-webkit-slider-thumb {
     pointer-events: all;
     -webkit-appearance: none;
-    width: 18px;
-    height: 18px;
+    width: var(--tl-thumb-size);
+    height: var(--tl-thumb-size);
     border-radius: 50%;
-    background: #38bdf8;
-    border: 2px solid white;
+    background: var(--tl-thumb-color);
+    border: var(--tl-thumb-border);
     cursor: pointer;
   }
 
   .slider::-webkit-slider-runnable-track {
-    height: 6px;
-    border-radius: 6px;
-    background: linear-gradient(to right, #334155, #334155);
+    height: var(--tl-track-height);
+    border-radius: var(--tl-track-radius);
+    background: var(--tl-track-color);
   }
 </style>

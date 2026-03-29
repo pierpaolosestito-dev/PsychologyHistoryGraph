@@ -878,6 +878,101 @@ valid(V) :- node(V), macro(V, ${macroAtom}).
 <div
   class="app-root"
   style="
+  --info-top: {UI.infoPanel.top}px;
+--info-right: {UI.infoPanel.right}px;
+--info-width: {UI.infoPanel.width}px;
+--info-max-height: {UI.infoPanel.maxHeight}px;
+--info-padding: {UI.infoPanel.padding}px;
+--info-radius: {UI.infoPanel.borderRadius}px;
+--info-bg: {UI.infoPanel.background};
+--info-z: {UI.infoPanel.zIndex};
+
+--info-title-size: {UI.infoPanel.title.fontSize}px;
+
+--modal-backdrop: {UI.infoPanel.modal.backdrop};
+--modal-z: {UI.infoPanel.modal.zIndex};
+
+--modal-card-width: {UI.infoPanel.modal.cardWidth};
+--modal-card-max-height: {UI.infoPanel.modal.cardMaxHeight};
+--modal-card-bg: {UI.infoPanel.modal.cardBg};
+--modal-card-radius: {UI.infoPanel.modal.cardRadius}px;
+
+--modal-header-size: {UI.infoPanel.modal.headerFontSize}px;
+--modal-header-border: {UI.infoPanel.modal.headerBorder};
+
+--modal-body-padding: {UI.infoPanel.modal.bodyPadding}px;
+--modal-line-height: {UI.infoPanel.modal.lineHeight};
+
+--modal-footer-padding: {UI.infoPanel.modal.footerPadding};
+
+--modal-close-bg: {UI.infoPanel.modal.closeBg};
+--modal-close-color: {UI.infoPanel.modal.closeColor};
+--solver-top: {UI.solverPanel.top}px;
+--solver-right: {UI.solverPanel.right}px;
+--solver-width: {UI.solverPanel.width}px;
+--solver-max-height: {UI.solverPanel.maxHeight};
+--solver-padding: {UI.solverPanel.padding}px;
+--solver-radius: {UI.solverPanel.borderRadius}px;
+--solver-bg: {UI.solverPanel.background};
+--solver-shadow: {UI.solverPanel.shadow};
+--solver-z: {UI.solverPanel.zIndex};
+--solver-font-size: {UI.solverPanel.fontSize}px;
+
+--solver-close-color: {UI.solverPanel.header.closeColor};
+
+--solver-meta-opacity: {UI.solverPanel.meta.opacity};
+--solver-meta-gap: {UI.solverPanel.meta.gap}px;
+
+--solver-selected-bg: {UI.solverPanel.selectedAnalysis.background};
+--solver-selected-padding: {UI.solverPanel.selectedAnalysis.padding}px;
+--solver-selected-radius: {UI.solverPanel.selectedAnalysis.radius}px;
+--solver-selected-mt: {UI.solverPanel.selectedAnalysis.marginTop}px;
+
+--solver-controls-gap: {UI.solverPanel.controls.gap}px;
+--solver-controls-mt: {UI.solverPanel.controls.marginTop}px;
+--solver-controls-mb: {UI.solverPanel.controls.marginBottom}px;
+--solver-input-width: {UI.solverPanel.controls.inputWidth}px;
+
+--solver-cliques-mt: {UI.solverPanel.cliques.marginTop}px;
+--solver-group-gap: {UI.solverPanel.cliques.groupGap}px;
+
+--solver-item-padding: {UI.solverPanel.cliques.item.padding};
+--solver-item-mb: {UI.solverPanel.cliques.item.marginBottom}px;
+--solver-item-bg: {UI.solverPanel.cliques.item.background};
+--solver-item-hover: {UI.solverPanel.cliques.item.hover};
+--solver-item-radius: {UI.solverPanel.cliques.item.radius}px;
+--solver-item-font: {UI.solverPanel.cliques.item.fontSize}px;
+
+--solver-badge-bg: {UI.solverPanel.cliques.badge.bg};
+--solver-badge-color: {UI.solverPanel.cliques.badge.color};
+--solver-badge-font: {UI.solverPanel.cliques.badge.fontSize}px;
+--solver-badge-padding: {UI.solverPanel.cliques.badge.padding};
+--solver-badge-radius: {UI.solverPanel.cliques.badge.radius}px;
+--history-left: {UI.historyPanel.left}px;
+--history-bottom: {UI.historyPanel.bottom}px;
+--history-max-width: {UI.historyPanel.maxWidth};
+--history-padding: {UI.historyPanel.padding}px;
+--history-radius: {UI.historyPanel.borderRadius}px;
+--history-bg: {UI.historyPanel.background};
+--history-z: {UI.historyPanel.zIndex};
+--history-font: {UI.historyPanel.fontSize}px;
+--history-color: {UI.historyPanel.textColor};
+
+--history-header-mb: {UI.historyPanel.header.marginBottom}px;
+
+--history-clear-bg: {UI.historyPanel.clearButton.background};
+--history-clear-radius: {UI.historyPanel.clearButton.radius}px;
+--history-clear-size: {UI.historyPanel.clearButton.size}px;
+
+--history-gap: {UI.historyPanel.crumbs.gap}px;
+
+--history-crumb-bg: {UI.historyPanel.crumb.background};
+--history-crumb-hover: {UI.historyPanel.crumb.hover};
+--history-crumb-padding: {UI.historyPanel.crumb.padding};
+--history-crumb-radius: {UI.historyPanel.crumb.radius}px;
+--history-crumb-max: {UI.historyPanel.crumb.maxWidth}px;
+
+--history-sep-opacity: {UI.historyPanel.separator.opacity};
   --body-bg: {UI.body.background};
 --body-color: {UI.body.textColor};
 --body-font: {UI.body.fontFamily};

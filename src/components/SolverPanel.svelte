@@ -277,17 +277,17 @@
 <style>
   .solver-panel {
     position: absolute;
-    right: 20px;
-    top: 20px;
-    width: 420px;
-    max-height: 85vh;
+    right: var(--solver-right);
+    top: var(--solver-top);
+    width: var(--solver-width);
+    max-height: var(--solver-max-height);
     overflow-y: auto;
-    background: rgba(15, 23, 42, 0.97);
-    padding: 18px;
-    border-radius: 14px;
-    box-shadow: 0 20px 40px rgba(0,0,0,0.5);
-    z-index: 50;
-    font-size: 13px;
+    background: var(--solver-bg);
+    padding: var(--solver-padding);
+    border-radius: var(--solver-radius);
+    box-shadow: var(--solver-shadow);
+    z-index: var(--solver-z);
+    font-size: var(--solver-font-size);
   }
 
   .solver-header {
@@ -299,33 +299,33 @@
   .close-btn {
     background: none;
     border: none;
-    color: white;
+    color: var(--solver-close-color);
     cursor: pointer;
     font-size: 16px;
   }
 
   .solver-meta div {
-    margin-bottom: 4px;
-    opacity: 0.85;
+    margin-bottom: var(--solver-meta-gap);
+    opacity: var(--solver-meta-opacity);
   }
 
   .selected-analysis {
-    margin-top: 10px;
-    padding: 10px;
-    background: rgba(99,102,241,0.15);
-    border-radius: 8px;
+    margin-top: var(--solver-selected-mt);
+    padding: var(--solver-selected-padding);
+    background: var(--solver-selected-bg);
+    border-radius: var(--solver-selected-radius);
   }
 
   .solver-controls {
-    margin-top: 14px;
-    margin-bottom: 14px;
+    margin-top: var(--solver-controls-mt);
+    margin-bottom: var(--solver-controls-mb);
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: var(--solver-controls-gap);
   }
 
   .solver-controls input[type="number"] {
-    width: 70px;
+    width: var(--solver-input-width);
     margin-left: 6px;
   }
 
@@ -333,20 +333,12 @@
     margin-left: 6px;
   }
 
-  .solver-histogram {
-    margin-top: 12px;
-  }
-
-  .hist-line {
-    opacity: 0.8;
-  }
-
   .solver-cliques {
-    margin-top: 14px;
+    margin-top: var(--solver-cliques-mt);
   }
 
   .size-group {
-    margin-bottom: 12px;
+    margin-bottom: var(--solver-group-gap);
   }
 
   .size-title {
@@ -355,26 +347,26 @@
   }
 
   .clique-item {
-    padding: 6px 8px;
-    margin-bottom: 4px;
-    background: rgba(56,189,248,0.18);
-    border-radius: 6px;
+    padding: var(--solver-item-padding);
+    margin-bottom: var(--solver-item-mb);
+    background: var(--solver-item-bg);
+    border-radius: var(--solver-item-radius);
     cursor: pointer;
-    font-size: 12px;
+    font-size: var(--solver-item-font);
     display: flex;
     justify-content: space-between;
   }
 
   .clique-item:hover {
-    background: rgba(56,189,248,0.35);
+    background: var(--solver-item-hover);
   }
 
   .max-badge {
-    font-size: 10px;
-    background: #facc15;
-    color: black;
-    padding: 2px 4px;
-    border-radius: 4px;
+    font-size: var(--solver-badge-font);
+    background: var(--solver-badge-bg);
+    color: var(--solver-badge-color);
+    padding: var(--solver-badge-padding);
+    border-radius: var(--solver-badge-radius);
     margin-left: 6px;
   }
 
