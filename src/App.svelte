@@ -875,7 +875,50 @@ valid(V) :- node(V), macro(V, ${macroAtom}).
   });
 </script>
 
-<div bind:this={container} class="graph"></div>
+<div
+  class="app-root"
+  style="
+  --body-bg: {UI.body.background};
+--body-color: {UI.body.textColor};
+--body-font: {UI.body.fontFamily};
+
+--toolbar-bg: {UI.toolbar.background};
+--toolbar-z: {UI.toolbar.zIndex};
+
+--zoom-margin-left: {UI.zoom.marginLeft}px;
+
+--filter-bg: {UI.filterCard.background};
+--filter-z: {UI.filterCard.zIndex};
+--filter-max-width: {UI.filterCard.maxWidth}px;
+--filter-max-height: {UI.filterCard.maxHeight};
+
+--autocomplete-bg: {UI.autocomplete.background};
+--autocomplete-radius: {UI.autocomplete.borderRadius}px;
+--autocomplete-shadow: {UI.autocomplete.shadow};
+--autocomplete-z: {UI.autocomplete.zIndex};
+--autocomplete-offset-y: {UI.autocomplete.offsetY}px;
+    --toolbar-top: {UI.toolbar.top}px;
+    --toolbar-left: {UI.toolbar.left}px;
+    --toolbar-gap: {UI.toolbar.spacing}px;
+    --toolbar-padding: {UI.toolbar.padding};
+    --toolbar-radius: {UI.toolbar.borderRadius}px;
+
+    --search-width: {UI.search.width}px;
+    --search-max-width: {UI.search.maxWidth};
+
+    --zoom-gap: {UI.zoom.gap}px;
+
+    --filter-top: {UI.filterCard.top}px;
+    --filter-left: {UI.filterCard.left}px;
+    --filter-padding: {UI.filterCard.padding}px;
+    --filter-radius: {UI.filterCard.borderRadius}px;
+    --filter-font-size: {UI.filterCard.fontSize}px;
+
+    --autocomplete-item-padding: {UI.autocomplete.itemPadding};
+    --autocomplete-font-size: {UI.autocomplete.fontSize}px;
+  "
+>
+  <div bind:this={container} class="graph"></div>
 
 <!-- TOOLBAR -->
 <div class="toolbar">
@@ -1022,14 +1065,15 @@ valid(V) :- node(V), macro(V, ${macroAtom}).
     refreshNodeVisuals();
   }}
 />
+</div>
 
 <style>
   :global(body) {
     margin: 0;
     overflow: hidden;
-    background: #020617;
-    font-family: system-ui, sans-serif;
-    color: #e2e8f0;
+    background: var(--body-bg);
+    font-family: var(--body-font);
+    color: var(--body-color);
   }
 
   .graph {
@@ -1039,15 +1083,15 @@ valid(V) :- node(V), macro(V, ${macroAtom}).
 
   .toolbar {
     position: absolute;
-    top: 10px;
-    left: 10px;
+    top: var(--toolbar-top);
+    left: var(--toolbar-left);
     display: flex;
-    gap: 8px;
+    gap: var(--toolbar-gap);
     align-items: center;
-    background: rgba(15, 23, 42, 0.85);
-    padding: 8px 10px;
-    border-radius: 8px;
-    z-index: 30;
+    background: var(--toolbar-bg);
+    padding: var(--toolbar-padding);
+    border-radius: var(--toolbar-radius);
+    z-index: var(--toolbar-z);
   }
 
   .search-wrap {
@@ -1056,23 +1100,28 @@ valid(V) :- node(V), macro(V, ${macroAtom}).
     align-items: center;
   }
 
+  .search-wrap input {
+    width: var(--search-width);
+    max-width: var(--search-max-width);
+  }
+
   .autocomplete {
     position: absolute;
-    top: calc(100% + 6px);
+    top: calc(100% + var(--autocomplete-offset-y));
     left: 0;
-    width: 320px;
-    max-width: 56vw;
-    background: rgba(15, 23, 42, 0.95);
-    border-radius: 8px;
+    width: var(--search-width);
+    max-width: var(--search-max-width);
+    background: var(--autocomplete-bg);
+    border-radius: var(--autocomplete-radius);
     overflow: hidden;
-    z-index: 20;
-    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
+    z-index: var(--autocomplete-z);
+    box-shadow: var(--autocomplete-shadow);
   }
 
   .autocomplete-item {
-    padding: 6px 10px;
+    padding: var(--autocomplete-item-padding);
     cursor: pointer;
-    font-size: 13px;
+    font-size: var(--autocomplete-font-size);
     line-height: 1.2;
     border-top: 1px solid rgba(148, 163, 184, 0.08);
     white-space: nowrap;
@@ -1085,30 +1134,30 @@ valid(V) :- node(V), macro(V, ${macroAtom}).
   }
 
   .autocomplete-item:hover {
-    background: rgba(56, 189, 248, 0.2);
+    background: var(--autocomplete-hover, rgba(56, 189, 248, 0.2));
   }
 
   .zoom-inline {
     display: flex;
     flex-direction: column;
-    gap: 4px;
-    margin-left: 6px;
+    gap: var(--zoom-gap);
+    margin-left: var(--zoom-margin-left);
   }
 
   .filter-card {
     position: absolute;
-    top: 64px;
-    left: 10px;
+    top: var(--filter-top);
+    left: var(--filter-left);
     display: flex;
     flex-direction: column;
     gap: 10px;
-    background: rgba(15, 23, 42, 0.85);
-    padding: 10px;
-    border-radius: 8px;
-    z-index: 10;
-    font-size: 13px;
-    max-width: 280px;
-    max-height: 55vh;
+    background: var(--filter-bg);
+    padding: var(--filter-padding);
+    border-radius: var(--filter-radius);
+    z-index: var(--filter-z);
+    font-size: var(--filter-font-size);
+    max-width: var(--filter-max-width);
+    max-height: var(--filter-max-height);
     overflow-y: auto;
   }
 
@@ -1120,7 +1169,7 @@ valid(V) :- node(V), macro(V, ${macroAtom}).
 
   .filter-title {
     font-weight: 600;
-    color: #7dd3fc;
+    color: var(--filter-title-color, #7dd3fc);
   }
 
   .filter-card label {
@@ -1131,6 +1180,6 @@ valid(V) :- node(V), macro(V, ${macroAtom}).
   }
 
   .filter-card input[type="checkbox"] {
-    accent-color: #38bdf8;
+    accent-color: var(--filter-accent-color, #38bdf8);
   }
 </style>

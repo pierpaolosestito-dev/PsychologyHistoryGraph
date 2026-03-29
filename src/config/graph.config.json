@@ -64,42 +64,65 @@
 },
   
   "ui": {
-    "toolbar": {
-      "icon": {
-        "src": "icon.png",
-        "width": 28,
-        "height": 28,
-        "marginRight": 6
-      },
-      "spacing": 8,
-      "padding": "8px 10px",
-      "borderRadius": 8,
-      "top": 10,
-      "left": 10
-    },
-
-    "search": {
-      "width": 320,
-      "maxWidth": "56vw"
-    },
-
-    "zoom": {
-      "gap": 4
-    },
-
-    "filterCard": {
-      "top": 64,
-      "left": 10,
-      "padding": 10,
-      "borderRadius": 8,
-      "fontSize": 13
-    },
-
-    "autocomplete": {
-      "itemPadding": "6px 10px",
-      "fontSize": 13
-    }
+  "body": {
+    "background": "#f8fafc",
+    "textColor": "#0f172a",
+    "fontFamily": "system-ui, sans-serif"
   },
+
+  "toolbar": {
+    "icon": {
+      "src": "icon.png",
+      "width": 28,
+      "height": 28,
+      "marginRight": 6
+    },
+    "spacing": 8,
+    "padding": "8px 10px",
+    "borderRadius": 8,
+    "top": 10,
+    "left": 10,
+    "background": "rgba(255, 255, 255, 0.9)",
+    "zIndex": 30
+  },
+
+  "search": {
+    "width": 320,
+    "maxWidth": "56vw"
+  },
+
+  "zoom": {
+    "gap": 4,
+    "marginLeft": 6
+  },
+
+  "filterCard": {
+    "top": 64,
+    "left": 10,
+    "padding": 10,
+    "borderRadius": 8,
+    "fontSize": 13,
+    "background": "rgba(255, 255, 255, 0.9)",
+    "zIndex": 10,
+    "maxWidth": 280,
+    "maxHeight": "55vh"
+  },
+
+  "autocomplete": {
+    "itemPadding": "6px 10px",
+    "fontSize": 13,
+    "background": "#ffffff",
+    "borderRadius": 8,
+    "shadow": "0 10px 24px rgba(0, 0, 0, 0.15)",
+    "zIndex": 20,
+    "offsetY": 6
+  },
+
+  "filters": {
+    "titleColor": "#0284c7",
+    "accentColor": "#0ea5e9"
+  }
+},
 
   "filters": {
   "enabled": true,
