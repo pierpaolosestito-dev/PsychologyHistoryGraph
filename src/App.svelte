@@ -1174,7 +1174,7 @@ valid(V) :- node(V), macro(V, ${macroAtom}).
     Clear Clique
   </button>
 
-  <img src="{GRAPH_CONFIG.ui.toolbar.icon}" alt="Icon" style="width:28px; height:28px; margin-right:6px;" />
+  <img src="{GRAPH_CONFIG.ui.toolbar.icon.src}" alt="Icon" style="width:28px; height:28px; margin-right:6px;" />
 
   <div class="search-wrap">
     <input

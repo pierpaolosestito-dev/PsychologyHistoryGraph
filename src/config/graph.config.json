@@ -21,7 +21,7 @@
   },
 
   "node": {
-    "icon": "https://static.vecteezy.com/system/resources/thumbnails/009/971/218/small/chat-bot-icon-isolated-contour-symbol-illustration-vector.jpg",
+    "icon": "/PsychologyHistoryGraph/icon.png",
     "iconSize": 14,
     "ring": {
       "innerRadius": 0.65,
@@ -230,7 +230,7 @@
 
   "toolbar": {
     "icon": {
-      "src": "https://static.vecteezy.com/system/resources/thumbnails/009/971/218/small/chat-bot-icon-isolated-contour-symbol-illustration-vector.jpg",
+      "src": "/PsychologyHistoryGraph/icon.png",
       "width": 28,
       "height": 28,
       "marginRight": 6
@@ -297,12 +297,12 @@
 },
   "default": {
     "color": "#334155",
-    "icon": "https://static.vecteezy.com/system/resources/thumbnails/009/971/218/small/chat-bot-icon-isolated-contour-symbol-illustration-vector.jpg"
+    "icon": "/PsychologyHistoryGraph/icon.png"
   },
 
   "person": {
     "color": "#38bdf8",
-    "icon": "person.png",
+    "icon": "/PsychologyHistoryGraph/icon.png",
     "category": "temporal",
     "timeline": {
       "startField": "anno_nascita",
@@ -313,7 +313,7 @@
 
   "place": {
     "color": "#22c55e",
-    "icon": "place.png",
+    "icon": "/PsychologyHistoryGraph/icon.png",
     "category": "spatial",
     "alwaysVisible": true
   }
