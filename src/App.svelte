@@ -314,23 +314,23 @@
   }
 
   // ---------------- HISTORY ----------------
-  let history: string[] = [];
+  let history: { id: string; label: string }[] = [];
 
   
 
-  function startHistory(label: string) {
-  history = [label];
+  function startHistory(id: string, label: string) {
+  history = [{ id, label }];
 }
 
- function pushHistory(label: string) {
-  if (history[history.length - 1] === label) return;
-  history = [...history, label];
+ function pushHistory(id: string, label: string) {
+  if (history[history.length - 1]?.id === id) return;
+  history = [...history, { id, label }];
 }
 
   function truncateHistoryTo(id: string) {
-    const idx = history.lastIndexOf(id);
-    if (idx >= 0) history = history.slice(0, idx + 1);
-  }
+  const idx = history.findIndex(h => h.id === id);
+  if (idx >= 0) history = history.slice(0, idx + 1);
+}
 
   function clearHistory() {
     history = [];
@@ -646,15 +646,18 @@
     refreshNodeVisuals();
   }
 
-  function commitNeighbor(id: string) {
-    rootSelectedId = id;
-    selectedId = id;
-    highlightedNeighbors = new Set();
-    pushHistory(id);
-    focusNode(id);
-    selectNode(id);
-    refreshNodeVisuals();
-  }
+  function commitNeighbor(id: string, label: string = "") {
+  rootSelectedId = id;
+  selectedId = id;
+  highlightedNeighbors = new Set();
+
+  const node = getNodeById(id);
+  pushHistory(id, node?.label ?? label ?? id);
+
+  focusNode(id);
+  selectNode(id);
+  refreshNodeVisuals();
+}
 
   function backToRoot() {
     if (!rootSelectedId) return;
@@ -689,7 +692,7 @@ function searchNode(q: string) {
   selectedId = id;
   highlightedNeighbors = new Set();
 
-  startHistory(node.label);
+  startHistory(node.id,node.label);
 
   const isVisible = data.nodes.find((n: any) => n.id === id);
   console.log("👁️ VISIBILE PRIMA?", !!isVisible);
@@ -996,7 +999,7 @@ valid(V) :- node(V), macro(V, ${macroAtom}).
         selectedId = node.id;
         highlightedNeighbors = new Set();
         showSuggestions = false;
-        startHistory(node.label);
+        startHistory(node.id,node.label);
         focusNode(node.id);
         selectNode(node.id);
         updateSelectedDetails(node.id);
@@ -1263,7 +1266,10 @@ valid(V) :- node(V), macro(V, ${macroAtom}).
   {highlightedNeighbors}
   onBackToRoot={backToRoot}
   onViewNeighbor={viewNeighbor}
-  onCommitNeighbor={commitNeighbor}
+  onCommitNeighbor={(id) => {
+  const node = getNodeById(id);
+  commitNeighbor(id, node?.label ?? id);
+}}
 />
 
 <HistoryPanel

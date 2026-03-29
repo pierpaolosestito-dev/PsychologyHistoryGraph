@@ -1,5 +1,5 @@
 <script lang="ts">
-  export let history: string[] = [];
+  export let history: { id: string; label: string }[] = [];
   export let onJumpTo: (id: string) => void;
   export let onClear: () => void;
 </script>
@@ -12,10 +12,10 @@
     </div>
 
     <div class="crumbs">
-      {#each history as label, i}
-  <button class="crumb" type="button" on:click={() => onJumpTo(label)}>
-    {label}
-  </button>
+      {#each history as item, i}
+        <button class="crumb" type="button" on:click={() => onJumpTo(item.id)}>
+          {item.label}
+        </button>
         {#if i < history.length - 1}
           <span class="sep">→</span>
         {/if}
