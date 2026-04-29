@@ -1,6 +1,6 @@
 <script lang="ts">
   import { createEventDispatcher } from "svelte";
-  import GRAPH_CONFIG from "../config/graph.config.json";
+  import RAW_GRAPH_CONFIG from "../config/graph.config.json";
 
   export let open: boolean = false;
 
@@ -28,8 +28,56 @@
 
   const dispatch = createEventDispatcher();
 
-  const SOLVER_CFG = GRAPH_CONFIG.solver ?? {};
-  const F = SOLVER_CFG.features ?? {};
+  const DEFAULT_SOLVER_CFG = {
+    enabled: true,
+    features: {
+      macroFilter: true,
+      minSize: true,
+      topPerSize: true,
+      onlyMaximum: true,
+      showAll: true,
+      filterBySelectedNode: true,
+      downloadCSV: true,
+      histogram: true,
+      stats: true,
+      selectedAnalysis: true
+    }
+  };
+
+  function isPlainObject(value: any): boolean {
+    return (
+      value !== null &&
+      typeof value === "object" &&
+      !Array.isArray(value)
+    );
+  }
+
+  function deepMerge<T = any>(base: T, override: any): T {
+    if (!isPlainObject(base)) return override ?? base;
+    if (!isPlainObject(override)) return base;
+
+    const result: any = { ...(base as any) };
+
+    for (const key of Object.keys(override)) {
+      const baseValue = (base as any)[key];
+      const overrideValue = override[key];
+
+      if (isPlainObject(baseValue) && isPlainObject(overrideValue)) {
+        result[key] = deepMerge(baseValue, overrideValue);
+      } else {
+        result[key] = overrideValue;
+      }
+    }
+
+    return result;
+  }
+
+  const SOLVER_CFG = deepMerge(
+    DEFAULT_SOLVER_CFG,
+    (RAW_GRAPH_CONFIG as any)?.solver ?? {}
+  );
+
+  const F = SOLVER_CFG.features ?? DEFAULT_SOLVER_CFG.features;
 
   let showOnlyMaximum = false;
   let showAll = false;
@@ -118,12 +166,12 @@
 
   $: selectedCliqueCount =
     selectedNodeId
-      ? (allCliques ?? []).filter(c => c.includes(selectedNodeId)).length
+      ? (allCliques ?? []).filter(c => Array.isArray(c) && c.includes(selectedNodeId)).length
       : 0;
 
   $: selectedInMaximum =
     selectedNodeId
-      ? (maximumCliques ?? []).some(c => c.includes(selectedNodeId))
+      ? (maximumCliques ?? []).some(c => Array.isArray(c) && c.includes(selectedNodeId))
       : false;
 
   function downloadCSV() {
@@ -157,8 +205,8 @@
 
   {#if F.stats !== false}
   <div class="solver-meta">
-    <div><strong>Total cliques:</strong> {stats?.totalCliques}</div>
-    <div><strong>Maximum size:</strong> {stats?.maxSize}</div>
+    <div><strong>Total cliques:</strong> {stats?.totalCliques ?? 0}</div>
+    <div><strong>Maximum size:</strong> {stats?.maxSize ?? 0}</div>
 
     {#if stats?.timeMs}
       <div><strong>Solver time:</strong> {stats.timeMs.toFixed(2)} ms</div>

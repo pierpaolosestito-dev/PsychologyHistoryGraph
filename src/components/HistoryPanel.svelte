@@ -1,7 +1,7 @@
 <script lang="ts">
   export let history: { id: string; label: string }[] = [];
-  export let onJumpTo: (id: string) => void;
-  export let onClear: () => void;
+  export let onJumpTo: (id: string) => void = () => {};
+  export let onClear: () => void = () => {};
 </script>
 
 {#if history.length > 0}

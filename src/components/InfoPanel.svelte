@@ -6,16 +6,18 @@
     label: string;
   };
 
+  type GenericRecord = Record<string, any>;
+
   // Props dal parent
   export let selectedNode: any = null;
-  export let selectedDetails: NodeDetails | null = null;
+  export let selectedDetails: NodeDetails | GenericRecord | null = null;
   export let rootSelectedId: string | null = null;
   export let neighborIds: Neighbor[] = [];
   export let highlightedNeighbors: Set<string> = new Set();
 
-  export let onBackToRoot: () => void;
-  export let onViewNeighbor: (id: string) => void;
-  export let onCommitNeighbor: (id: string) => void;
+  export let onBackToRoot: () => void = () => {};
+  export let onViewNeighbor: (id: string) => void = () => {};
+  export let onCommitNeighbor: (id: string) => void = () => {};
 
   let showModal = false;
 
@@ -33,6 +35,43 @@
 
   function onBackdropClick(e: MouseEvent) {
     if (e.target === e.currentTarget) closeModal();
+  }
+
+  function isRenderablePrimitive(value: any) {
+    return (
+      value !== null &&
+      value !== undefined &&
+      (typeof value === "string" ||
+        typeof value === "number" ||
+        typeof value === "boolean")
+    );
+  }
+
+  function formatKey(key: string) {
+    return key
+      .replace(/_/g, " ")
+      .replace(/\b\w/g, c => c.toUpperCase());
+  }
+
+  function getGenericDetails(details: GenericRecord | null) {
+    if (!details) return [];
+
+    const excluded = new Set([
+      "tipo",
+      "titolo",
+      "roles",
+      "biografia_html",
+      "contenuto",
+      "immagine_url"
+    ]);
+
+    return Object.entries(details)
+      .filter(([key, value]) => !excluded.has(key) && isRenderablePrimitive(value))
+      .map(([key, value]) => ({
+        key,
+        label: formatKey(key),
+        value
+      }));
   }
 </script>
 
@@ -103,12 +142,17 @@
 
             {#if selectedDetails.tipo === "person"}
 
-              <p><strong>Nascita:</strong>
-                {selectedDetails.luogo_nascita}
-                {#if selectedDetails.anno_nascita}
-                  ({selectedDetails.anno_nascita})
-                {/if}
-              </p>
+              {#if selectedDetails.luogo_nascita || selectedDetails.anno_nascita}
+                <p>
+                  <strong>Nascita:</strong>
+                  {#if selectedDetails.luogo_nascita}
+                    {selectedDetails.luogo_nascita}
+                  {/if}
+                  {#if selectedDetails.anno_nascita}
+                    ({selectedDetails.anno_nascita})
+                  {/if}
+                </p>
+              {/if}
 
               {#if selectedDetails.anno_morte}
                 <p><strong>Morte:</strong> {selectedDetails.anno_morte}</p>
@@ -116,6 +160,10 @@
 
               {#if selectedDetails.periodo}
                 <p><strong>Periodo:</strong> {selectedDetails.periodo}</p>
+              {/if}
+
+              {#if selectedDetails.description}
+                <p><strong>Descrizione:</strong> {selectedDetails.description}</p>
               {/if}
 
               {#if selectedDetails.roles && selectedDetails.roles.length > 0}
@@ -142,9 +190,15 @@
                 </ul>
               {/if}
 
-              <hr />
+              {#if getGenericDetails(selectedDetails).length > 0}
+                <hr />
+                {#each getGenericDetails(selectedDetails) as item}
+                  <p><strong>{item.label}:</strong> {item.value}</p>
+                {/each}
+              {/if}
 
               {#if selectedDetails.biografia_html}
+                <hr />
                 <div class="biografia">
                   {@html selectedDetails.biografia_html}
                 </div>
@@ -164,10 +218,35 @@
                 <p><strong>Città:</strong> {selectedDetails.citta}</p>
               {/if}
 
+              {#if selectedDetails.kind}
+                <p><strong>Tipo:</strong> {selectedDetails.kind}</p>
+              {/if}
+
+              {#if selectedDetails.description}
+                <p><strong>Descrizione:</strong> {selectedDetails.description}</p>
+              {/if}
+
+              {#if getGenericDetails(selectedDetails).length > 0}
+                <hr />
+                {#each getGenericDetails(selectedDetails) as item}
+                  <p><strong>{item.label}:</strong> {item.value}</p>
+                {/each}
+              {/if}
+
               {#if selectedDetails.contenuto}
                 <div class="contenuto">
                   {@html selectedDetails.contenuto}
                 </div>
+              {/if}
+
+            {:else}
+
+              {#if getGenericDetails(selectedDetails).length > 0}
+                {#each getGenericDetails(selectedDetails) as item}
+                  <p><strong>{item.label}:</strong> {item.value}</p>
+                {/each}
+              {:else}
+                <p>Nessun dettaglio disponibile.</p>
               {/if}
 
             {/if}
@@ -219,6 +298,15 @@
     margin: 0;
     font-size: var(--info-title-size);
     text-decoration: underline;
+  }
+
+  .back-btn {
+    margin-bottom: 10px;
+    cursor: pointer;
+  }
+
+  .explore-btn {
+    cursor: pointer;
   }
 
   .modal-backdrop {

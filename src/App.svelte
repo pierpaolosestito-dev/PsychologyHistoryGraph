@@ -3,12 +3,432 @@
   import ForceGraph3D from "3d-force-graph";
   import * as THREE from "three";
   import { forceManyBody, forceCenter, forceLink } from "d3-force-3d";
-  import GRAPH_CONFIG from "./config/graph.config.json";
+  import RAW_GRAPH_CONFIG from "./config/graph.config.json";
   import TimelineSlider from "./components/TimelineSlider.svelte";
   import { getUnifiedGraph } from "./data/unifiedDataset";
   import InfoPanel from "./components/InfoPanel.svelte";
   import HistoryPanel from "./components/HistoryPanel.svelte";
   import SolverPanel from "./components/SolverPanel.svelte";
+
+  // ---------------------------------------------------------------------------
+  // DEFAULT CONFIG
+  // ---------------------------------------------------------------------------
+  // Questo fallback permette all'app di funzionare anche se graph.config.json
+  // è vuoto oppure contiene solo i mapping essenziali del dataset, ad esempio:
+  //
+  // {
+  //   "nodeTypes": {
+  //     "actor": {
+  //       "timeline": {
+  //         "startField": "$.data.active_from",
+  //         "endField": "$.data.active_to"
+  //       },
+  //       "macroAreaField": "$.data.affiliations[*].macro_area"
+  //     }
+  //   }
+  // }
+  // ---------------------------------------------------------------------------
+
+  const DEFAULT_GRAPH_CONFIG: any = {
+    graph: {
+      backgroundColor: "#050816",
+      nodeOpacity: 0.95,
+      linkOpacity: 0.4,
+      linkWidth: 0.4
+    },
+
+    forces: {
+      charge: -60,
+      linkDistance: 70,
+      linkStrength: 0.5
+    },
+
+    colors: {
+      root: "#facc15",
+      neighbor: "#60a5fa",
+      preview: "#7dd3fc",
+      default: "#334155",
+      clique: "#7dd3fc"
+    },
+
+    node: {
+      icon: "/icon.png",
+      iconSize: 14,
+      ring: {
+        innerRadius: 0.65,
+        outerRadius: 0.85,
+        segments: 32,
+        scale: 8
+      },
+      label: {
+        font: "26px sans-serif",
+        scale: [18, 8],
+        offsetY: -10
+      }
+    },
+
+    features: {
+      filters: true,
+      timeline: true
+    },
+
+    timeline: {
+      debounceMs: 140,
+      start: 1776,
+      end: 2017,
+      mode: "graph-aware"
+    },
+
+    solver: {
+      enabled: true,
+      features: {
+        macroFilter: true,
+        minSize: true,
+        topPerSize: true,
+        onlyMaximum: true,
+        showAll: true,
+        filterBySelectedNode: true,
+        downloadCSV: true,
+        histogram: true,
+        stats: true,
+        selectedAnalysis: true
+      }
+    },
+
+    ui: {
+      timeline: {
+        bottom: 20,
+        width: "min(800px, 90vw)",
+        padding: "16px 24px",
+        borderRadius: 16,
+        background: "rgba(255,255,255,0.9)",
+        blur: 8,
+        shadow: "0 10px 30px rgba(0,0,0,0.15)",
+        zIndex: 25,
+
+        label: {
+          gap: 12,
+          fontSize: 18,
+          fontWeight: 600,
+          marginBottom: 12
+        },
+
+        slider: {
+          height: 40,
+          trackHeight: 6,
+          trackRadius: 6,
+          trackColor: "#cbd5f5",
+          thumbSize: 18,
+          thumbColor: "#0ea5e9",
+          thumbBorder: "2px solid white"
+        }
+      },
+
+      infoPanel: {
+        top: 10,
+        right: 10,
+        width: 260,
+        maxHeight: 340,
+        padding: 12,
+        borderRadius: 8,
+        background: "rgba(255,255,255,0.9)",
+        zIndex: 10,
+
+        title: {
+          fontSize: 16
+        },
+
+        modal: {
+          backdrop: "rgba(2,6,23,0.6)",
+          zIndex: 999,
+
+          cardWidth: "min(720px, 92vw)",
+          cardMaxHeight: "85vh",
+          cardBg: "#ffffff",
+          cardRadius: 12,
+
+          headerFontSize: 20,
+          headerBorder: "1px solid rgba(0,0,0,0.1)",
+
+          bodyPadding: 16,
+          lineHeight: 1.6,
+
+          footerPadding: "12px 16px",
+
+          closeBg: "rgba(0,0,0,0.05)",
+          closeColor: "#0f172a"
+        }
+      },
+
+      solverPanel: {
+        top: 20,
+        right: 20,
+        width: 420,
+        maxHeight: "85vh",
+        padding: 18,
+        borderRadius: 14,
+        background: "rgba(255,255,255,0.95)",
+        shadow: "0 20px 40px rgba(0,0,0,0.15)",
+        zIndex: 50,
+        fontSize: 13,
+
+        header: {
+          titleSize: 16,
+          closeColor: "#0f172a"
+        },
+
+        meta: {
+          opacity: 0.85,
+          gap: 4
+        },
+
+        selectedAnalysis: {
+          background: "rgba(99,102,241,0.15)",
+          padding: 10,
+          radius: 8,
+          marginTop: 10
+        },
+
+        controls: {
+          gap: 6,
+          marginTop: 14,
+          marginBottom: 14,
+          inputWidth: 70
+        },
+
+        cliques: {
+          marginTop: 14,
+          groupGap: 12,
+          titleSize: 14,
+
+          item: {
+            padding: "6px 8px",
+            marginBottom: 4,
+            background: "rgba(14,165,233,0.15)",
+            hover: "rgba(14,165,233,0.3)",
+            radius: 6,
+            fontSize: 12
+          },
+
+          badge: {
+            bg: "#facc15",
+            color: "#000",
+            fontSize: 10,
+            padding: "2px 4px",
+            radius: 4
+          }
+        }
+      },
+
+      historyPanel: {
+        left: 10,
+        bottom: 10,
+        maxWidth: "min(560px, 92vw)",
+        padding: 10,
+        borderRadius: 8,
+        background: "rgba(255,255,255,0.95)",
+        zIndex: 15,
+        fontSize: 13,
+        textColor: "#0f172a",
+
+        header: {
+          marginBottom: 8
+        },
+
+        clearButton: {
+          background: "rgba(0,0,0,0.06)",
+          radius: 6,
+          size: 28
+        },
+
+        crumbs: {
+          gap: 6
+        },
+
+        crumb: {
+          background: "rgba(14,165,233,0.12)",
+          hover: "rgba(14,165,233,0.22)",
+          padding: "4px 8px",
+          radius: 999,
+          maxWidth: 220
+        },
+
+        separator: {
+          opacity: 0.6
+        }
+      },
+
+      body: {
+        background: "#f8fafc",
+        textColor: "#0f172a",
+        fontFamily: "system-ui, sans-serif"
+      },
+
+      toolbar: {
+        icon: {
+          src: "/icon.png",
+          width: 28,
+          height: 28,
+          marginRight: 6
+        },
+        spacing: 8,
+        padding: "8px 10px",
+        borderRadius: 8,
+        top: 10,
+        left: 10,
+        background: "rgba(255, 255, 255, 0.9)",
+        zIndex: 30
+      },
+
+      search: {
+        width: 320,
+        maxWidth: "56vw"
+      },
+
+      zoom: {
+        gap: 4,
+        marginLeft: 6
+      },
+
+      filterCard: {
+        top: 64,
+        left: 10,
+        padding: 10,
+        borderRadius: 8,
+        fontSize: 13,
+        background: "rgba(255, 255, 255, 0.9)",
+        zIndex: 10,
+        maxWidth: 280,
+        maxHeight: "55vh"
+      },
+
+      autocomplete: {
+        itemPadding: "6px 10px",
+        fontSize: 13,
+        background: "#ffffff",
+        borderRadius: 8,
+        shadow: "0 10px 24px rgba(0, 0, 0, 0.15)",
+        zIndex: 20,
+        offsetY: 6
+      },
+
+      filters: {
+        titleColor: "#0284c7",
+        accentColor: "#0ea5e9"
+      }
+    },
+
+    filters: {
+      enabled: true,
+      types: true,
+      macroAreas: true
+    },
+
+    nodeTypes: {
+      highlight: {
+        root: "#facc15",
+        neighbor: "#60a5fa",
+        preview: "#7dd3fc",
+        clique: "#7dd3fc"
+      },
+
+      default: {
+        color: "#334155",
+        icon: "/icon.png"
+      },
+
+      person: {
+        color: "#38bdf8",
+        icon: "/icon.png",
+        category: "temporal",
+        timeline: {
+          startField: "anno_nascita",
+          endField: "anno_morte"
+        },
+        macroAreaField: "roles[].macro_area"
+      },
+
+      place: {
+        color: "#22c55e",
+        icon: "/icon.png",
+        category: "spatial",
+        alwaysVisible: true
+      }
+    }
+  };
+
+  const RAW_CONFIG: any = RAW_GRAPH_CONFIG ?? {};
+
+  function isPlainObject(value: any): boolean {
+    return (
+      value !== null &&
+      typeof value === "object" &&
+      !Array.isArray(value)
+    );
+  }
+
+  function deepMerge<T = any>(base: T, override: any): T {
+    if (!isPlainObject(base)) return override ?? base;
+    if (!isPlainObject(override)) return base;
+
+    const result: any = { ...(base as any) };
+
+    for (const key of Object.keys(override)) {
+      const baseValue = (base as any)[key];
+      const overrideValue = override[key];
+
+      if (isPlainObject(baseValue) && isPlainObject(overrideValue)) {
+        result[key] = deepMerge(baseValue, overrideValue);
+      } else {
+        result[key] = overrideValue;
+      }
+    }
+
+    return result;
+  }
+
+  function hasOwnPath(obj: any, path: string): boolean {
+    const parts = path.split(".");
+    let cur = obj;
+
+    for (const p of parts) {
+      if (!cur || typeof cur !== "object" || !Object.prototype.hasOwnProperty.call(cur, p)) {
+        return false;
+      }
+      cur = cur[p];
+    }
+
+    return true;
+  }
+
+  const GRAPH_CONFIG: any = deepMerge(
+    DEFAULT_GRAPH_CONFIG,
+    RAW_CONFIG
+  );
+
+  function normalizeNodeTypeConfigs() {
+    const nodeTypes = GRAPH_CONFIG.nodeTypes ?? {};
+    const defaultStyle = nodeTypes.default ?? {};
+
+    for (const [type, cfg] of Object.entries(nodeTypes) as [string, any][]) {
+      if (type === "default" || type === "highlight") continue;
+      if (!cfg || typeof cfg !== "object") continue;
+
+      // Ogni tipo custom eredita almeno stile e icona dal tipo default.
+      GRAPH_CONFIG.nodeTypes[type] = {
+        ...defaultStyle,
+        ...cfg
+      };
+
+      // Se un tipo dichiara una timeline, allora è un tipo temporale
+      // anche se il JSON minimale non specifica category: "temporal".
+      if (GRAPH_CONFIG.nodeTypes[type].timeline && !GRAPH_CONFIG.nodeTypes[type].category) {
+        GRAPH_CONFIG.nodeTypes[type].category = "temporal";
+      }
+    }
+  }
+
+  normalizeNodeTypeConfigs();
 
   const UI = GRAPH_CONFIG.ui;
 
@@ -74,6 +494,8 @@
   function atomize(s: string) {
     return (s ?? "")
       .trim()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
       .replace(/\s+/g, " ")
       .toLowerCase()
       .replace(/&/g, "")
@@ -108,6 +530,149 @@
   function updateSelectedDetails(id: string) {
     const node = getNodeById(id);
     selectedDetails = buildUiDetails(node);
+  }
+
+  // ---------------------------------------------------------------------------
+  // JSONPATH-LIKE FIELD EXTRACTION
+  // ---------------------------------------------------------------------------
+  // Supporta una forma leggera di JSONPath sufficiente per i mapping del grafo:
+  //
+  // - "roles[].macro_area"
+  // - "roles[*].macro_area"
+  // - "data.roles[].macro_area"
+  // - "$.data.roles[*].macro_area"
+  //
+  // Se il path non inizia con "$" o "data.", viene interpretato come relativo
+  // a node.data. Quindi "roles[].macro_area" equivale a
+  // "$.data.roles[*].macro_area".
+  // ---------------------------------------------------------------------------
+
+  function normalizeJsonPathExpression(path: string): string {
+    let expr = (path ?? "").trim();
+
+    if (!expr) return "";
+
+    if (expr.startsWith("$.")) {
+      expr = expr.slice(2);
+    } else if (expr.startsWith("$")) {
+      expr = expr.slice(1).replace(/^\./, "");
+    } else if (!expr.startsWith("data.")) {
+      expr = `data.${expr}`;
+    }
+
+    expr = expr
+      .replace(/\[\*\]/g, "[]")
+      .replace(/\[\]/g, "[]");
+
+    return expr;
+  }
+
+  function jsonPathValues(root: any, path: string): any[] {
+    const expr = normalizeJsonPathExpression(path);
+    if (!expr) return [];
+
+    const segments = expr.split(".").filter(Boolean);
+    let current: any[] = [root];
+
+    for (const rawSegment of segments) {
+      const isArrayExpansion = rawSegment.endsWith("[]");
+      const key = isArrayExpansion
+        ? rawSegment.slice(0, -2)
+        : rawSegment;
+
+      const next: any[] = [];
+
+      for (const item of current) {
+        if (item == null) continue;
+
+        const value = item[key];
+
+        if (isArrayExpansion) {
+          if (Array.isArray(value)) {
+            next.push(...value);
+          }
+        } else {
+          if (Array.isArray(value)) {
+            next.push(...value);
+          } else if (value !== undefined && value !== null) {
+            next.push(value);
+          }
+        }
+      }
+
+      current = next;
+    }
+
+    return current
+      .flat(Infinity)
+      .filter((v) => v !== undefined && v !== null);
+  }
+
+  function getTimelineValue(node: any, fieldOrPath: string, fallback: number): number {
+    if (!fieldOrPath) return fallback;
+
+    const direct = node.data?.[fieldOrPath];
+    if (direct !== undefined && direct !== null) {
+      const n = Number(direct);
+      return Number.isFinite(n) ? n : fallback;
+    }
+
+    const values = jsonPathValues(node, fieldOrPath);
+    const first = values[0];
+
+    if (first === undefined || first === null) return fallback;
+
+    const n = Number(first);
+    return Number.isFinite(n) ? n : fallback;
+  }
+
+  function hasTimelineConfig(node: any): boolean {
+    const config = GRAPH_CONFIG.nodeTypes?.[node.type];
+    return !!config?.timeline?.startField && !!config?.timeline?.endField;
+  }
+
+  function isTemporalNode(node: any): boolean {
+    const config = GRAPH_CONFIG.nodeTypes?.[node.type];
+
+    // Compatibilità con il vecchio config completo:
+    // category: "temporal" continua a funzionare.
+    if (config?.category === "temporal") return true;
+
+    // Compatibilità con il config minimale:
+    // se un tipo dichiara una timeline, è trattato come temporale.
+    return hasTimelineConfig(node);
+  }
+
+  function updateTimelineBoundsFromDataIfNeeded() {
+    const userProvidedStart = hasOwnPath(RAW_CONFIG, "timeline.start");
+    const userProvidedEnd = hasOwnPath(RAW_CONFIG, "timeline.end");
+
+    // Se l'utente ha specificato esplicitamente start/end, non li tocchiamo.
+    if (userProvidedStart && userProvidedEnd) return;
+
+    if (!originalData?.nodes?.length) return;
+
+    let min = Number.POSITIVE_INFINITY;
+    let max = Number.NEGATIVE_INFINITY;
+
+    for (const node of originalData.nodes) {
+      if (!hasTimelineConfig(node)) continue;
+
+      const config = GRAPH_CONFIG.nodeTypes?.[node.type];
+      const start = getTimelineValue(node, config.timeline.startField, Number.NaN);
+      const end = getTimelineValue(node, config.timeline.endField, Number.NaN);
+
+      if (Number.isFinite(start)) min = Math.min(min, start);
+      if (Number.isFinite(end)) max = Math.max(max, end);
+    }
+
+    if (!Number.isFinite(min) || !Number.isFinite(max)) return;
+
+    if (!userProvidedStart) GRAPH_CONFIG.timeline.start = min;
+    if (!userProvidedEnd) GRAPH_CONFIG.timeline.end = max;
+
+    currentStart = GRAPH_CONFIG.timeline.start;
+    currentEnd = GRAPH_CONFIG.timeline.end;
   }
 
   // ---------------- DATASET ----------------
@@ -213,13 +778,9 @@
 
     if (!config?.macroAreaField) return [];
 
-    if (config.macroAreaField === "roles[].macro_area") {
-      return (node.data?.roles ?? [])
-        .map((r: any) => r?.macro_area)
-        .filter(Boolean);
-    }
-
-    return [];
+    return jsonPathValues(node, config.macroAreaField)
+      .map((value) => String(value).trim())
+      .filter(Boolean);
   }
 
   function nodePassesMacroFilters(node: any) {
@@ -233,10 +794,19 @@
   function nodePassesTimeline(node: any) {
     const config = GRAPH_CONFIG.nodeTypes?.[node.type];
 
-    if (!config || !config.timeline) return true;
+    if (!config?.timeline) return true;
 
-    const start = node.data?.[config.timeline.startField] ?? 0;
-    const end = node.data?.[config.timeline.endField] ?? 9999;
+    const start = getTimelineValue(
+      node,
+      config.timeline.startField,
+      0
+    );
+
+    const end = getTimelineValue(
+      node,
+      config.timeline.endField,
+      9999
+    );
 
     return start <= currentEnd && end >= currentStart;
   }
@@ -256,22 +826,31 @@
 
       const visibleTemporal = new Set<string>();
 
-      // --- STEP 1: nodi temporali (es. person)
+      // --- STEP 1: nodi temporali
       for (const node of originalData.nodes) {
+        if (!isTemporalNode(node)) continue;
+
         const config = GRAPH_CONFIG.nodeTypes?.[node.type];
+        if (!config?.timeline) continue;
 
-        if (!config || config.category !== "temporal") continue;
-        if (!config.timeline) continue;
+        const start = getTimelineValue(
+          node,
+          config.timeline.startField,
+          0
+        );
 
-        const start = node.data?.[config.timeline.startField] ?? 0;
-        const end = node.data?.[config.timeline.endField] ?? 9999;
+        const end = getTimelineValue(
+          node,
+          config.timeline.endField,
+          9999
+        );
 
         if (start <= currentEnd && end >= currentStart) {
           visibleTemporal.add(node.id);
         }
       }
 
-      // --- STEP 2: espansione ai nodi collegati (es. place)
+      // --- STEP 2: espansione ai nodi collegati
       const visibleRelated = new Set<string>();
 
       for (const link of originalData.links) {
@@ -297,10 +876,23 @@
         visibleNodes.add(node.id);
       }
 
+      // --- STEP 5: fallback robusto
+      // Se il graph-aware non trova nodi temporali, evitiamo una schermata vuota
+      // e passiamo al comportamento simple.
+      if (visibleNodes.size === 0) {
+        for (const node of originalData.nodes) {
+          if (!nodePassesTypeFilters(node)) continue;
+          if (!nodePassesMacroFilters(node)) continue;
+          if (!nodePassesTimeline(node)) continue;
+
+          visibleNodes.add(node.id);
+        }
+      }
+
     } else {
 
       // =========================================================
-      // 🔹 MODE 2: SIMPLE (fallback vecchio comportamento)
+      // 🔹 MODE 2: SIMPLE
       // =========================================================
       for (const node of originalData.nodes) {
         if (!nodePassesTypeFilters(node)) continue;
@@ -312,7 +904,7 @@
     }
 
     // =========================================================
-    // 🔹 LINK FILTERING (coerente)
+    // 🔹 LINK FILTERING
     // =========================================================
     const filteredLinks = originalData.links.filter((l: any) => {
       const s = getLinkEndId(l.source);
@@ -391,6 +983,7 @@
       }))
     };
 
+    updateTimelineBoundsFromDataIfNeeded();
     buildSearchIndexFromNodes(originalData.nodes);
     computeDynamicFilters();
     recomputeGraphData();
@@ -472,7 +1065,13 @@
 
   function getNodeStyle(node: any) {
     const type = getNodeType(node);
-    return GRAPH_CONFIG.nodeTypes[type] || GRAPH_CONFIG.nodeTypes.default;
+    const defaultStyle = GRAPH_CONFIG.nodeTypes.default ?? {};
+    const typeStyle = GRAPH_CONFIG.nodeTypes[type] ?? {};
+
+    return {
+      ...defaultStyle,
+      ...typeStyle
+    };
   }
 
   const H = GRAPH_CONFIG.nodeTypes.highlight;
@@ -486,14 +1085,14 @@
 
     // Stato normale
     if (!selectedId) {
-      return getNodeStyle(n).color;
+      return getNodeStyle(n).color ?? GRAPH_CONFIG.colors?.default ?? "#334155";
     }
 
     if (n.id === selectedId) return H.root;
     if (highlightedNeighbors.has(n.id)) return H.preview;
     if (neighborMap.get(selectedId)?.has(n.id)) return H.neighbor;
 
-    return getNodeStyle(n).color;
+    return getNodeStyle(n).color ?? GRAPH_CONFIG.colors?.default ?? "#334155";
   };
 
   function opacityForNode(nodeId: string) {
@@ -848,8 +1447,8 @@
     selectedTypes = new Set();
     selectedMacroAreasFilter = new Set();
 
-    currentStart = 1776;
-    currentEnd = 2017;
+    currentStart = GRAPH_CONFIG.timeline.start;
+    currentEnd = GRAPH_CONFIG.timeline.end;
 
     recomputeGraphData();
     refreshNodeVisuals();
@@ -924,7 +1523,7 @@ valid(V) :- node(V), macro(V, ${macroAtom}).
       facts += `node(${idx}).\n`;
     }
 
-    // ---------------- MACRO FACTS (GENERIC) ----------------
+    // ---------------- MACRO FACTS (GENERIC)
     for (const node of data.nodes) {
       const idx = indexMap.get(node.id);
       if (!idx) continue;
@@ -1062,7 +1661,6 @@ valid(V) :- node(V), macro(V, ${macroAtom}).
 
         showSolverPanel = true;
         cliqueNodes = new Set(maxCliques[0]);
-        //graph3D.refresh();
 
         console.timeEnd("CLIQUE_TIME");
 

@@ -1,11 +1,74 @@
 <script lang="ts">
   import { createEventDispatcher } from "svelte";
-  import GRAPH_CONFIG from "../config/graph.config.json"
-  const UI = GRAPH_CONFIG.ui;
+  import RAW_GRAPH_CONFIG from "../config/graph.config.json";
+
+  const DEFAULT_TIMELINE_UI = {
+    bottom: 20,
+    width: "min(800px, 90vw)",
+    padding: "16px 24px",
+    borderRadius: 16,
+    background: "rgba(255,255,255,0.9)",
+    blur: 8,
+    shadow: "0 10px 30px rgba(0,0,0,0.15)",
+    zIndex: 25,
+
+    label: {
+      gap: 12,
+      fontSize: 18,
+      fontWeight: 600,
+      marginBottom: 12
+    },
+
+    slider: {
+      height: 40,
+      trackHeight: 6,
+      trackRadius: 6,
+      trackColor: "#cbd5f5",
+      thumbSize: 18,
+      thumbColor: "#0ea5e9",
+      thumbBorder: "2px solid white"
+    }
+  };
+
+  function isPlainObject(value: any): boolean {
+    return (
+      value !== null &&
+      typeof value === "object" &&
+      !Array.isArray(value)
+    );
+  }
+
+  function deepMerge<T = any>(base: T, override: any): T {
+    if (!isPlainObject(base)) return override ?? base;
+    if (!isPlainObject(override)) return base;
+
+    const result: any = { ...(base as any) };
+
+    for (const key of Object.keys(override)) {
+      const baseValue = (base as any)[key];
+      const overrideValue = override[key];
+
+      if (isPlainObject(baseValue) && isPlainObject(overrideValue)) {
+        result[key] = deepMerge(baseValue, overrideValue);
+      } else {
+        result[key] = overrideValue;
+      }
+    }
+
+    return result;
+  }
+
+  const UI = {
+    timeline: deepMerge(
+      DEFAULT_TIMELINE_UI,
+      (RAW_GRAPH_CONFIG as any)?.ui?.timeline ?? {}
+    )
+  };
+
   const dispatch = createEventDispatcher();
 
-  export let min:number;
-  export let max:number;
+  export let min: number;
+  export let max: number;
 
   // ✅ controllati dal parent (App.svelte)
   export let start = min;
