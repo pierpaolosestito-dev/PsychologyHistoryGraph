@@ -1,4 +1,3 @@
-
 <script lang="ts">
   import { onMount, onDestroy } from "svelte";
   import ForceGraph3D from "3d-force-graph";
@@ -10,7 +9,9 @@
   import InfoPanel from "./components/InfoPanel.svelte";
   import HistoryPanel from "./components/HistoryPanel.svelte";
   import SolverPanel from "./components/SolverPanel.svelte";
+
   const UI = GRAPH_CONFIG.ui;
+
   let container: HTMLDivElement;
   let graph3D: any;
   let clingoWorker: Worker;
@@ -31,6 +32,9 @@
   let neighborMap: Map<string, Set<string>> = new Map();
   let highlightedNeighbors = new Set<string>();
   let cliqueNodes = new Set<string>();
+
+  // ---------------- EASTER EGG STATE ----------------
+  let easterEggMode = false;
 
   // ---------------- SOLVER STATE ----------------
   let showSolverPanel = false;
@@ -92,14 +96,14 @@
   }
 
   function buildUiDetails(node: any) {
-  if (!node) return null;
+    if (!node) return null;
 
-  return {
-    tipo: node.type ?? "unknown",
-    titolo: node.label,
-    ...node.data
-  };
-}
+    return {
+      tipo: node.type ?? "unknown",
+      titolo: node.label,
+      ...node.data
+    };
+  }
 
   function updateSelectedDetails(id: string) {
     const node = getNodeById(id);
@@ -118,14 +122,85 @@
     const macroSet = new Set<string>();
 
     for (const node of originalData.nodes) {
-  if (node.type) typeSet.add(node.type);
+      if (node.type) typeSet.add(node.type);
 
-  const macros = extractMacroAreas(node);
-  macros.forEach(m => macroSet.add(m));
-}
+      const macros = extractMacroAreas(node);
+      macros.forEach(m => macroSet.add(m));
+    }
 
     availableTypes = Array.from(typeSet).sort();
     availableMacroAreas = Array.from(macroSet).sort();
+  }
+
+  function isGraphEmpty(graph: any): boolean {
+    const nodes = graph?.nodes ?? [];
+    const edges = graph?.edges ?? [];
+
+    return nodes.length === 0 && edges.length === 0;
+  }
+
+  function getKliqueAspEasterEggGraph() {
+    const raw = "KLIQUEASP";
+
+    const nodes: any[] = [];
+    const edges: any[] = [];
+
+    const spacingX = 24;
+    const spacingY = 16;
+    const startX = -((raw.length - 1) * spacingX) / 2;
+
+    raw.split("").forEach((char, i) => {
+      const id = `kliqueasp_${i}_${char.toLowerCase()}`;
+      const x = startX + i * spacingX;
+
+      nodes.push({
+        id,
+        label: char,
+        type: "logo",
+        fx: x,
+        fy: 0,
+        fz: 0,
+        data: {
+          description: "KliqueASP easter egg node",
+          letter: char
+        }
+      });
+
+      if (i > 0) {
+        edges.push({
+          source: `kliqueasp_${i - 1}_${raw[i - 1].toLowerCase()}`,
+          target: id,
+          type: "logo_link"
+        });
+      }
+    });
+
+    nodes.push({
+      id: "kliqueasp_core",
+      label: "ASP",
+      type: "logo",
+      fx: 0,
+      fy: -spacingY,
+      fz: 0,
+      data: {
+        description: "Reasoning core"
+      }
+    });
+
+    for (const node of nodes) {
+      if (node.id !== "kliqueasp_core") {
+        edges.push({
+          source: "kliqueasp_core",
+          target: node.id,
+          type: "reasoning_link"
+        });
+      }
+    }
+
+    return {
+      nodes,
+      edges
+    };
   }
 
   function nodePassesTypeFilters(node: any) {
@@ -134,148 +209,148 @@
   }
 
   function extractMacroAreas(node: any): string[] {
-  const config = GRAPH_CONFIG.nodeTypes?.[node.type];
+    const config = GRAPH_CONFIG.nodeTypes?.[node.type];
 
-  if (!config?.macroAreaField) return [];
+    if (!config?.macroAreaField) return [];
 
-  if (config.macroAreaField === "roles[].macro_area") {
-    return (node.data?.roles ?? [])
-      .map((r: any) => r?.macro_area)
-      .filter(Boolean);
+    if (config.macroAreaField === "roles[].macro_area") {
+      return (node.data?.roles ?? [])
+        .map((r: any) => r?.macro_area)
+        .filter(Boolean);
+    }
+
+    return [];
   }
 
-  return [];
-}
-
   function nodePassesMacroFilters(node: any) {
-  if (!macroFiltersEnabled || selectedMacroAreasFilter.size === 0) return true;
+    if (!macroFiltersEnabled || selectedMacroAreasFilter.size === 0) return true;
 
-  return extractMacroAreas(node).some((m) =>
-    selectedMacroAreasFilter.has(m)
-  );
-}
+    return extractMacroAreas(node).some((m) =>
+      selectedMacroAreasFilter.has(m)
+    );
+  }
 
   function nodePassesTimeline(node: any) {
-  const config = GRAPH_CONFIG.nodeTypes?.[node.type];
+    const config = GRAPH_CONFIG.nodeTypes?.[node.type];
 
-  if (!config || !config.timeline) return true;
+    if (!config || !config.timeline) return true;
 
-  const start = node.data?.[config.timeline.startField] ?? 0;
-  const end = node.data?.[config.timeline.endField] ?? 9999;
+    const start = node.data?.[config.timeline.startField] ?? 0;
+    const end = node.data?.[config.timeline.endField] ?? 9999;
 
-  return start <= currentEnd && end >= currentStart;
-}
+    return start <= currentEnd && end >= currentStart;
+  }
 
- function recomputeGraphData() {
-  if (!originalData) return;
+  function recomputeGraphData() {
+    if (!originalData) return;
 
-  const TIMELINE_CFG = GRAPH_CONFIG.timeline ?? {};
-  const mode = TIMELINE_CFG.mode ?? "graph-aware";
+    const TIMELINE_CFG = GRAPH_CONFIG.timeline ?? {};
+    const mode = easterEggMode ? "simple" : (TIMELINE_CFG.mode ?? "graph-aware");
 
-  const visibleNodes = new Set<string>();
+    const visibleNodes = new Set<string>();
 
-  // =========================================================
-  // 🔹 MODE 1: GRAPH-AWARE (timeline intelligente)
-  // =========================================================
-  if (mode === "graph-aware") {
+    // =========================================================
+    // 🔹 MODE 1: GRAPH-AWARE (timeline intelligente)
+    // =========================================================
+    if (mode === "graph-aware") {
 
-    const visibleTemporal = new Set<string>();
+      const visibleTemporal = new Set<string>();
 
-    // --- STEP 1: nodi temporali (es. person)
-    for (const node of originalData.nodes) {
-      const config = GRAPH_CONFIG.nodeTypes?.[node.type];
+      // --- STEP 1: nodi temporali (es. person)
+      for (const node of originalData.nodes) {
+        const config = GRAPH_CONFIG.nodeTypes?.[node.type];
 
-      if (!config || config.category !== "temporal") continue;
-      if (!config.timeline) continue;
+        if (!config || config.category !== "temporal") continue;
+        if (!config.timeline) continue;
 
-      const start = node.data?.[config.timeline.startField] ?? 0;
-      const end = node.data?.[config.timeline.endField] ?? 9999;
+        const start = node.data?.[config.timeline.startField] ?? 0;
+        const end = node.data?.[config.timeline.endField] ?? 9999;
 
-      if (start <= currentEnd && end >= currentStart) {
-        visibleTemporal.add(node.id);
+        if (start <= currentEnd && end >= currentStart) {
+          visibleTemporal.add(node.id);
+        }
+      }
+
+      // --- STEP 2: espansione ai nodi collegati (es. place)
+      const visibleRelated = new Set<string>();
+
+      for (const link of originalData.links) {
+        const s = getLinkEndId(link.source);
+        const t = getLinkEndId(link.target);
+
+        if (visibleTemporal.has(s)) visibleRelated.add(t);
+        if (visibleTemporal.has(t)) visibleRelated.add(s);
+      }
+
+      // --- STEP 3: unione
+      const expanded = new Set<string>([
+        ...visibleTemporal,
+        ...visibleRelated
+      ]);
+
+      // --- STEP 4: applica filtri (type + macro)
+      for (const node of originalData.nodes) {
+        if (!expanded.has(node.id)) continue;
+        if (!nodePassesTypeFilters(node)) continue;
+        if (!nodePassesMacroFilters(node)) continue;
+
+        visibleNodes.add(node.id);
+      }
+
+    } else {
+
+      // =========================================================
+      // 🔹 MODE 2: SIMPLE (fallback vecchio comportamento)
+      // =========================================================
+      for (const node of originalData.nodes) {
+        if (!nodePassesTypeFilters(node)) continue;
+        if (!nodePassesMacroFilters(node)) continue;
+        if (!nodePassesTimeline(node)) continue;
+
+        visibleNodes.add(node.id);
       }
     }
 
-    // --- STEP 2: espansione ai nodi collegati (es. place)
-    const visibleRelated = new Set<string>();
+    // =========================================================
+    // 🔹 LINK FILTERING (coerente)
+    // =========================================================
+    const filteredLinks = originalData.links.filter((l: any) => {
+      const s = getLinkEndId(l.source);
+      const t = getLinkEndId(l.target);
+      return visibleNodes.has(s) && visibleNodes.has(t);
+    });
 
-    for (const link of originalData.links) {
-      const s = getLinkEndId(link.source);
-      const t = getLinkEndId(link.target);
+    const filteredNodes = originalData.nodes.filter((n: any) =>
+      visibleNodes.has(n.id)
+    );
 
-      if (visibleTemporal.has(s)) visibleRelated.add(t);
-      if (visibleTemporal.has(t)) visibleRelated.add(s);
-    }
-
-    // --- STEP 3: unione
-    const expanded = new Set<string>([
-      ...visibleTemporal,
-      ...visibleRelated
-    ]);
-
-    // --- STEP 4: applica filtri (type + macro)
-    for (const node of originalData.nodes) {
-      if (!expanded.has(node.id)) continue;
-      if (!nodePassesTypeFilters(node)) continue;
-      if (!nodePassesMacroFilters(node)) continue;
-
-      visibleNodes.add(node.id);
-    }
-
-  } else {
+    data = {
+      nodes: filteredNodes,
+      links: filteredLinks
+    };
 
     // =========================================================
-    // 🔹 MODE 2: SIMPLE (fallback vecchio comportamento)
+    // 🔹 rebuild neighbor map
     // =========================================================
-    for (const node of originalData.nodes) {
-      if (!nodePassesTypeFilters(node)) continue;
-      if (!nodePassesMacroFilters(node)) continue;
-      if (!nodePassesTimeline(node)) continue;
+    buildNeighborMap();
 
-      visibleNodes.add(node.id);
+    // =========================================================
+    // 🔹 reset selection se non più valida
+    // =========================================================
+    if (selectedId && !visibleNodes.has(selectedId)) {
+      selectedId = null;
+      rootSelectedId = null;
+      selectedNode = null;
+      selectedDetails = null;
+      highlightedNeighbors = new Set();
     }
+
+    // =========================================================
+    // 🔹 update graph
+    // =========================================================
+    graph3D.graphData(data);
+    refreshNodeVisuals();
   }
-
-  // =========================================================
-  // 🔹 LINK FILTERING (coerente)
-  // =========================================================
-  const filteredLinks = originalData.links.filter((l: any) => {
-    const s = getLinkEndId(l.source);
-    const t = getLinkEndId(l.target);
-    return visibleNodes.has(s) && visibleNodes.has(t);
-  });
-
-  const filteredNodes = originalData.nodes.filter((n: any) =>
-    visibleNodes.has(n.id)
-  );
-
-  data = {
-    nodes: filteredNodes,
-    links: filteredLinks
-  };
-
-  // =========================================================
-  // 🔹 rebuild neighbor map
-  // =========================================================
-  buildNeighborMap();
-
-  // =========================================================
-  // 🔹 reset selection se non più valida
-  // =========================================================
-  if (selectedId && !visibleNodes.has(selectedId)) {
-    selectedId = null;
-    rootSelectedId = null;
-    selectedNode = null;
-    selectedDetails = null;
-    highlightedNeighbors = new Set();
-  }
-
-  // =========================================================
-  // 🔹 update graph
-  // =========================================================
-  graph3D.graphData(data);
-  refreshNodeVisuals();
-}
 
   function loadDataset() {
     currentStart = GRAPH_CONFIG.timeline.start;
@@ -289,23 +364,33 @@
     cliqueNodes = new Set();
     clearHistory();
 
-    const graph = getUnifiedGraph();
+    let graph = getUnifiedGraph();
+
+    if (isGraphEmpty(graph)) {
+      console.info("🥚 Empty dataset detected. Loading KliqueASP easter egg graph.");
+      easterEggMode = true;
+      graph = getKliqueAspEasterEggGraph();
+    } else {
+      easterEggMode = false;
+    }
 
     originalData = {
-  nodes: graph.nodes.map((n: any) => {
-    const label = normalizeName(n.label);
-    return {
-      ...n,
-      label,
-      id: atomize(label)   // 🔥 FIX CRITICO
+      nodes: graph.nodes.map((n: any) => {
+        const label = normalizeName(n.label);
+
+        return {
+          ...n,
+          label,
+          id: n.id ? atomize(n.id) : atomize(label)
+        };
+      }),
+      links: graph.edges.map((e: any) => ({
+        source: atomize(getLinkEndId(e.source)),
+        target: atomize(getLinkEndId(e.target)),
+        type: e.type
+      }))
     };
-  }),
-  links: graph.edges.map((e: any) => ({
-    source: atomize(e.source),
-    target: atomize(e.target),
-    type: e.type
-  }))
-};
+
     buildSearchIndexFromNodes(originalData.nodes);
     computeDynamicFilters();
     recomputeGraphData();
@@ -316,21 +401,19 @@
   // ---------------- HISTORY ----------------
   let history: { id: string; label: string }[] = [];
 
-  
-
   function startHistory(id: string, label: string) {
-  history = [{ id, label }];
-}
+    history = [{ id, label }];
+  }
 
- function pushHistory(id: string, label: string) {
-  if (history[history.length - 1]?.id === id) return;
-  history = [...history, { id, label }];
-}
+  function pushHistory(id: string, label: string) {
+    if (history[history.length - 1]?.id === id) return;
+    history = [...history, { id, label }];
+  }
 
   function truncateHistoryTo(id: string) {
-  const idx = history.findIndex(h => h.id === id);
-  if (idx >= 0) history = history.slice(0, idx + 1);
-}
+    const idx = history.findIndex(h => h.id === id);
+    if (idx >= 0) history = history.slice(0, idx + 1);
+  }
 
   function clearHistory() {
     history = [];
@@ -395,8 +478,13 @@
   const H = GRAPH_CONFIG.nodeTypes.highlight;
 
   const colorAccessor = (n: any) => {
-    if (cliqueNodes.has(n.id)) return H.clique;
+    // Clique highlight attivo
+    if (cliqueNodes.size > 0) {
+      if (cliqueNodes.has(n.id)) return H.clique;
+      return GRAPH_CONFIG.colors?.default ?? "#334155";
+    }
 
+    // Stato normale
     if (!selectedId) {
       return getNodeStyle(n).color;
     }
@@ -409,11 +497,18 @@
   };
 
   function opacityForNode(nodeId: string) {
-    if (cliqueNodes.has(nodeId)) return 1;
+    // Se è attivo un highlight di clique,
+    // i nodi della clique restano pieni, tutti gli altri vengono spenti.
+    if (cliqueNodes.size > 0) {
+      return cliqueNodes.has(nodeId) ? 1 : 0.12;
+    }
+
+    // Comportamento normale basato sulla selezione del nodo
     if (!selectedId) return 1;
     if (nodeId === selectedId) return 1;
     if (highlightedNeighbors.has(nodeId)) return 1;
     if (neighborMap.get(selectedId)?.has(nodeId)) return 0.95;
+
     return 0.22;
   }
 
@@ -421,30 +516,59 @@
   const textureLoader = new THREE.TextureLoader();
   const textureCache = new Map<string, THREE.Texture>();
 
-  function getTexture(path: string) {
-  if (!path) return null;
+  function normalizeAssetPath(path: string | undefined | null): string | null {
+    if (!path || typeof path !== "string") return null;
 
-  const safePath = path.startsWith("/") ? path : "/" + path;
+    const value = path.trim();
+    if (!value) return null;
 
-  if (!textureCache.has(safePath)) {
-    const tex = textureLoader.load(
-      safePath,
-      () => {
-        // 🔥 quando la texture è pronta → refresh nodi
-        refreshNodeVisuals();
-      },
-      undefined,
-      () => {
-        console.warn("❌ Texture non trovata:", safePath);
-      }
-    );
+    // URL assoluti esterni
+    if (/^https?:\/\//i.test(value)) {
+      return value;
+    }
 
-    tex.colorSpace = THREE.SRGBColorSpace;
-    textureCache.set(safePath, tex);
+    // Data URL base64
+    if (/^data:image\//i.test(value)) {
+      return value;
+    }
+
+    // Blob URL
+    if (/^blob:/i.test(value)) {
+      return value;
+    }
+
+    // Path assoluto già valido
+    if (value.startsWith("/")) {
+      return value;
+    }
+
+    // Path relativo locale
+    return "/" + value;
   }
 
-  return textureCache.get(safePath);
-}
+  function getTexture(path: string | undefined | null) {
+    const safePath = normalizeAssetPath(path);
+
+    if (!safePath) return null;
+
+    if (!textureCache.has(safePath)) {
+      const tex = textureLoader.load(
+        safePath,
+        () => {
+          refreshNodeVisuals();
+        },
+        undefined,
+        (err) => {
+          console.warn("❌ Texture non caricabile:", safePath, err);
+        }
+      );
+
+      tex.colorSpace = THREE.SRGBColorSpace;
+      textureCache.set(safePath, tex);
+    }
+
+    return textureCache.get(safePath) ?? null;
+  }
 
   const R = GRAPH_CONFIG.node.ring;
   const ringGeometry = new THREE.RingGeometry(R.innerRadius, R.outerRadius, R.segments);
@@ -512,39 +636,39 @@
   }
 
   function makeNodeObject(node: any) {
-  const group = new THREE.Group();
-  const o = opacityForNode(node.id);
+    const group = new THREE.Group();
+    const o = opacityForNode(node.id);
 
-  const style = getNodeStyle(node);
-  const tex = getTexture(style.icon);
+    const style = getNodeStyle(node);
+    const tex = node.type === "logo" ? null : getTexture(style.icon);
 
-  // 🔹 ICONA se disponibile
-  if (tex) {
-    group.add(makeIconSprite(node, GRAPH_CONFIG.node.iconSize, o));
-  } else {
-    // 🔥 fallback stabile
-    const sphere = new THREE.Mesh(
-      new THREE.SphereGeometry(2.5, 16, 16),
-      new THREE.MeshBasicMaterial({
-        color: colorAccessor(node),
-        transparent: true,
-        opacity: o
-      })
-    );
-    group.add(sphere);
+    // 🔹 ICONA se disponibile
+    if (tex) {
+      group.add(makeIconSprite(node, GRAPH_CONFIG.node.iconSize, o));
+    } else {
+      // 🔥 fallback stabile
+      const sphere = new THREE.Mesh(
+        new THREE.SphereGeometry(2.5, 16, 16),
+        new THREE.MeshBasicMaterial({
+          color: colorAccessor(node),
+          transparent: true,
+          opacity: o
+        })
+      );
+      group.add(sphere);
+    }
+
+    // 🔹 ring sempre
+    group.add(makeRing(colorAccessor(node), o));
+
+    // 🔹 label
+    const label = makeLabel(node.label, Math.max(0.18, o));
+    const L = GRAPH_CONFIG.node.label;
+    label.position.y = L.offsetY;
+    group.add(label);
+
+    return group;
   }
-
-  // 🔹 ring sempre
-  group.add(makeRing(colorAccessor(node), o));
-
-  // 🔹 label
-  const label = makeLabel(node.label, Math.max(0.18, o));
-  const L = GRAPH_CONFIG.node.label;
-  label.position.y = L.offsetY;
-  group.add(label);
-
-  return group;
-}
 
   function refreshNodeVisuals() {
     graph3D.nodeThreeObject((node: any) => makeNodeObject(node));
@@ -600,30 +724,29 @@
   }
 
   // ---------------- INTERACTIONS ----------------
-  
   function focusNode(id: string) {
-  const node = data.nodes.find((n: any) => n.id === id);
+    const node = data.nodes.find((n: any) => n.id === id);
 
-  console.log("🎯 FOCUS NODE:", node);
+    console.log("🎯 FOCUS NODE:", node);
 
-  if (!node) {
-    console.warn("❌ Nodo non presente nel grafo filtrato");
-    return;
+    if (!node) {
+      console.warn("❌ Nodo non presente nel grafo filtrato");
+      return;
+    }
+
+    console.log("📍 POS:", node.x, node.y, node.z);
+
+    if (node.x == null) {
+      console.warn("❌ Nodo SENZA coordinate (simulation non pronta)");
+      return;
+    }
+
+    graph3D.cameraPosition(
+      { x: node.x * 2, y: node.y * 2, z: node.z * 2 + 40 },
+      { x: node.x, y: node.y, z: node.z },
+      900
+    );
   }
-
-  console.log("📍 POS:", node.x, node.y, node.z);
-
-  if (node.x == null) {
-    console.warn("❌ Nodo SENZA coordinate (simulation non pronta)");
-    return;
-  }
-
-  graph3D.cameraPosition(
-    { x: node.x * 2, y: node.y * 2, z: node.z * 2 + 40 },
-    { x: node.x, y: node.y, z: node.z },
-    900
-  );
-}
 
   function selectNode(id: string) {
     const node = data.nodes.find((n: any) => n.id === id);
@@ -647,17 +770,17 @@
   }
 
   function commitNeighbor(id: string, label: string = "") {
-  rootSelectedId = id;
-  selectedId = id;
-  highlightedNeighbors = new Set();
+    rootSelectedId = id;
+    selectedId = id;
+    highlightedNeighbors = new Set();
 
-  const node = getNodeById(id);
-  pushHistory(id, node?.label ?? label ?? id);
+    const node = getNodeById(id);
+    pushHistory(id, node?.label ?? label ?? id);
 
-  focusNode(id);
-  selectNode(id);
-  refreshNodeVisuals();
-}
+    focusNode(id);
+    selectNode(id);
+    refreshNodeVisuals();
+  }
 
   function backToRoot() {
     if (!rootSelectedId) return;
@@ -667,49 +790,50 @@
     refreshNodeVisuals();
   }
 
-function searchNode(q: string) {
-  const text = q.trim().toLowerCase();
-  if (!text) return;
+  function searchNode(q: string) {
+    const text = q.trim().toLowerCase();
+    if (!text) return;
 
-  console.log("🔍 SEARCH:", text);
+    console.log("🔍 SEARCH:", text);
 
-  const node = originalData.nodes.find((n: any) =>
-    n.label.toLowerCase().includes(text)
-  );
+    const node = originalData.nodes.find((n: any) =>
+      n.label.toLowerCase().includes(text)
+    );
 
-  console.log("🔍 FOUND NODE:", node);
+    console.log("🔍 FOUND NODE:", node);
 
-  if (!node) {
-    console.warn("❌ Nodo non trovato");
-    return;
+    if (!node) {
+      console.warn("❌ Nodo non trovato");
+      return;
+    }
+
+    const id = node.id;
+
+    console.log("🧠 ID:", id);
+
+    rootSelectedId = id;
+    selectedId = id;
+    highlightedNeighbors = new Set();
+
+    startHistory(node.id,node.label);
+
+    const isVisible = data.nodes.find((n: any) => n.id === id);
+    console.log("👁️ VISIBILE PRIMA?", !!isVisible);
+
+    if (!isVisible) {
+      console.log("♻️ RECOMPUTE GRAPH...");
+      recomputeGraphData();
+    }
+
+    console.log("📊 NODO DOPO FILTER:", data.nodes.find(n => n.id === id));
+
+    focusNode(id);
+    selectNode(id);
+    refreshNodeVisuals();
   }
 
-  const id = node.id;
+  const toolbarIcon = GRAPH_CONFIG.ui.toolbar.icon;
 
-  console.log("🧠 ID:", id);
-
-  rootSelectedId = id;
-  selectedId = id;
-  highlightedNeighbors = new Set();
-
-  startHistory(node.id,node.label);
-
-  const isVisible = data.nodes.find((n: any) => n.id === id);
-  console.log("👁️ VISIBILE PRIMA?", !!isVisible);
-
-  if (!isVisible) {
-    console.log("♻️ RECOMPUTE GRAPH...");
-    recomputeGraphData();
-  }
-
-  console.log("📊 NODO DOPO FILTER:", data.nodes.find(n => n.id === id));
-
-  focusNode(id);
-  selectNode(id);
-  refreshNodeVisuals();
-}
-
-const toolbarIcon = GRAPH_CONFIG.ui.toolbar.icon;
   function resetView() {
     rootSelectedId = null;
     selectedId = null;
@@ -779,57 +903,57 @@ valid(V) :- node(V), macro(V, ${macroAtom}).
 `;
 
   function buildAspFactsFromCurrentData() {
-  if (!data) return { facts: "", reverseIndex: {} };
+    if (!data) return { facts: "", reverseIndex: {} };
 
-  const indexMap = new Map<string, number>();
-  const reverseIndex: Record<number, string> = {};
+    const indexMap = new Map<string, number>();
+    const reverseIndex: Record<number, string> = {};
 
-  let counter = 1;
+    let counter = 1;
 
-  // ---------------- NODE INDEX ----------------
-  for (const node of data.nodes) {
-    indexMap.set(node.id, counter);
-    reverseIndex[counter] = node.id;
-    counter++;
-  }
-
-  let facts = "";
-
-  // ---------------- NODE FACTS ----------------
-  for (const [, idx] of indexMap) {
-    facts += `node(${idx}).\n`;
-  }
-
-  // ---------------- MACRO FACTS (GENERIC) ----------------
-  for (const node of data.nodes) {
-    const idx = indexMap.get(node.id);
-    if (!idx) continue;
-
-    const macroAreas = extractMacroAreas(node);
-    if (!macroAreas.length) continue;
-
-    for (const macro of macroAreas) {
-      const atom = atomize(macro);
-      facts += `macro(${idx},${atom}).\n`;
+    // ---------------- NODE INDEX ----------------
+    for (const node of data.nodes) {
+      indexMap.set(node.id, counter);
+      reverseIndex[counter] = node.id;
+      counter++;
     }
-  }
 
-  // ---------------- EDGE FACTS ----------------
-  for (const link of data.links) {
-    const sourceId = getLinkEndId(link.source);
-    const targetId = getLinkEndId(link.target);
+    let facts = "";
 
-    const s = indexMap.get(sourceId);
-    const t = indexMap.get(targetId);
-
-    if (s && t) {
-      facts += `edge(${s},${t}).\n`;
-      facts += `edge(${t},${s}).\n`;
+    // ---------------- NODE FACTS ----------------
+    for (const [, idx] of indexMap) {
+      facts += `node(${idx}).\n`;
     }
-  }
 
-  return { facts, reverseIndex };
-}
+    // ---------------- MACRO FACTS (GENERIC) ----------------
+    for (const node of data.nodes) {
+      const idx = indexMap.get(node.id);
+      if (!idx) continue;
+
+      const macroAreas = extractMacroAreas(node);
+      if (!macroAreas.length) continue;
+
+      for (const macro of macroAreas) {
+        const atom = atomize(macro);
+        facts += `macro(${idx},${atom}).\n`;
+      }
+    }
+
+    // ---------------- EDGE FACTS ----------------
+    for (const link of data.links) {
+      const sourceId = getLinkEndId(link.source);
+      const targetId = getLinkEndId(link.target);
+
+      const s = indexMap.get(sourceId);
+      const t = indexMap.get(targetId);
+
+      if (s && t) {
+        facts += `edge(${s},${t}).\n`;
+        facts += `edge(${t},${s}).\n`;
+      }
+    }
+
+    return { facts, reverseIndex };
+  }
 
   async function runMaximumClique() {
     console.log("🔵 [CLIQUE] Starting computation on FILTERED graph...");
@@ -960,14 +1084,14 @@ valid(V) :- node(V), macro(V, ${macroAtom}).
   }
 
   function computeMacroAreas() {
-  const set = new Set<string>();
+    const set = new Set<string>();
 
-  for (const node of originalData?.nodes ?? []) {
-    extractMacroAreas(node).forEach(m => set.add(m));
+    for (const node of originalData?.nodes ?? []) {
+      extractMacroAreas(node).forEach(m => set.add(m));
+    }
+
+    availableMacroAreas = Array.from(set).sort();
   }
-
-  availableMacroAreas = Array.from(set).sort();
-}
 
   // ---------------- LIFECYCLE ----------------
   onMount(() => {
@@ -1175,7 +1299,6 @@ valid(V) :- node(V), macro(V, ${macroAtom}).
     Clear Clique
   </button>
 
-  
 <img
   src={toolbarIcon.src}
   alt="Icon"
