@@ -1620,12 +1620,30 @@ valid(V) :- node(V), macro(V, ${macroAtom}).
         }
 
         if (!foundCliques.length) {
-          console.warn("⚠️ No clique > size 2 found in filtered graph");
-          console.timeEnd("CLIQUE_TIME");
-          clingoWorker.removeEventListener("message", handler);
-          resolve();
-          return;
-        }
+  console.warn("⚠️ No clique > size 2 found in filtered graph");
+
+  maximumCliques = [];
+  allCliques = [];
+
+  solverStats = {
+    totalCliques: 0,
+    maxSize: 0,
+    histogram: new Map<number, number>(),
+    timeMs: t1 - t0,
+    nodesCount: data.nodes.length,
+    linksCount: data.links.length,
+    datasetMode: "unified",
+    periodLabel: `${currentStart}–${currentEnd}`
+  };
+
+  cliqueNodes = new Set();
+  showSolverPanel = true;
+
+  console.timeEnd("CLIQUE_TIME");
+  clingoWorker.removeEventListener("message", handler);
+  resolve();
+  return;
+}
 
         foundCliques.sort((a, b) => b.length - a.length);
 

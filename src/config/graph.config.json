@@ -302,7 +302,7 @@
 
   "person": {
     "color": "#38bdf8",
-    "icon": "/PsychologyHistoryGraph/icon.png",
+    "icon": "/PsychologyHistoryGraph/person.png",
     "category": "temporal",
     "timeline": {
       "startField": "anno_nascita",
@@ -313,8 +313,9 @@
 
   "place": {
     "color": "#22c55e",
-    "icon": "/PsychologyHistoryGraph/icon.png",
+    "icon": "/PsychologyHistoryGraph/place.png",
     "category": "spatial",
+    "macroAreaField": "macro_area",
     "alwaysVisible": true
   }
 }
