@@ -1431,7 +1431,12 @@
     refreshNodeVisuals();
   }
 
-  const toolbarIcon = GRAPH_CONFIG.ui.toolbar.icon;
+  const toolbarIcon = {
+  src: GRAPH_CONFIG.ui?.toolbar?.icon?.src || "/PsychologyHistoryGraph/icon.png",
+  width: GRAPH_CONFIG.ui?.toolbar?.icon?.width ?? 28,
+  height: GRAPH_CONFIG.ui?.toolbar?.icon?.height ?? 28,
+  marginRight: GRAPH_CONFIG.ui?.toolbar?.icon?.marginRight ?? 6
+};
 
   function resetView() {
     rootSelectedId = null;
@@ -1915,7 +1920,7 @@ valid(V) :- node(V), macro(V, ${macroAtom}).
     Clear Clique
   </button>
 
-<img
+<!--<img
   src={toolbarIcon.src}
   alt="Icon"
   style={`
@@ -1923,7 +1928,7 @@ valid(V) :- node(V), macro(V, ${macroAtom}).
     height:${toolbarIcon.height}px;
     margin-right:${toolbarIcon.marginRight}px;
   `}
-/>
+/>-->
 
   <div class="search-wrap">
     <input
@@ -1962,11 +1967,11 @@ valid(V) :- node(V), macro(V, ${macroAtom}).
 
 {#if GRAPH_CONFIG.features.filters}
   <div class="filter-card">
-    <strong>Filtri dinamici</strong>
+    <strong>Filters</strong>
 
     {#if typeFiltersEnabled}
       <div class="filter-section">
-        <span class="filter-title">Tipi</span>
+        <span class="filter-title">Types</span>
         {#each availableTypes as type}
           <label>
             <input
@@ -1982,7 +1987,7 @@ valid(V) :- node(V), macro(V, ${macroAtom}).
 
     {#if macroFiltersEnabled}
       <div class="filter-section">
-        <span class="filter-title">Macro aree</span>
+        <span class="filter-title">Groups</span>
         {#each availableMacroAreas as macro}
           <label>
             <input
@@ -2066,7 +2071,28 @@ valid(V) :- node(V), macro(V, ${macroAtom}).
   {availableMacroAreas}
   on:close={() => showSolverPanel = false}
   on:highlight={(e) => {
-    cliqueNodes = new Set(e.detail);
+    const clique = e.detail as string[];
+
+    cliqueNodes = new Set(clique);
+
+    const firstNodeId = clique[0];
+
+    if (firstNodeId) {
+      rootSelectedId = firstNodeId;
+      selectedId = firstNodeId;
+      highlightedNeighbors = new Set();
+
+      const node = getNodeById(firstNodeId);
+
+      if (node) {
+        startHistory(node.id, node.label);
+      }
+
+      focusNode(firstNodeId);
+      selectNode(firstNodeId);
+      updateSelectedDetails(firstNodeId);
+    }
+
     refreshNodeVisuals();
   }}
 />

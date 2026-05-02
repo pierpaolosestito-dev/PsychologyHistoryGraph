@@ -241,7 +241,7 @@
 
     {#if F.macroFilter !== false}
     <label>
-      Macro Area
+      Group
       <select bind:value={selectedMacroArea}>
         <option value="">-- none --</option>
         {#each availableMacroAreas as area}
