@@ -76,7 +76,7 @@
       debounceMs: 140,
       start: 1776,
       end: 2017,
-      mode: "graph-aware"
+      mode: "simple"
     },
 
     solver: {
@@ -1112,6 +1112,62 @@
   }
 
   // ---------------- ICON + RING ----------------
+  const AUTO_FALLBACK_PALETTE = [
+    "#38bdf8",
+    "#22c55e",
+    "#f59e0b",
+    "#a78bfa",
+    "#ef4444",
+    "#14b8a6",
+    "#f97316",
+    "#e879f9",
+    "#84cc16",
+    "#06b6d4"
+  ];
+
+  function hashString(value: string): number {
+    let h = 0;
+
+    for (let i = 0; i < value.length; i++) {
+      h = ((h << 5) - h) + value.charCodeAt(i);
+      h |= 0;
+    }
+
+    return Math.abs(h);
+  }
+
+  function getDeterministicFallbackColor(node: any): string {
+    const type = getNodeType(node);
+    const typeStyle = GRAPH_CONFIG.nodeTypes?.[type];
+
+    if (typeStyle?.color) return typeStyle.color;
+
+    const key = `${node.type ?? "default"}:${node.label ?? node.id ?? ""}`;
+
+    return AUTO_FALLBACK_PALETTE[
+      hashString(key) % AUTO_FALLBACK_PALETTE.length
+    ];
+  }
+
+  function getExplicitNodeIcon(node: any): string | null {
+    const type = getNodeType(node);
+
+    if (type === "logo") return null;
+
+    const rawTypeIcon = RAW_CONFIG?.nodeTypes?.[type]?.icon;
+    if (rawTypeIcon !== undefined) return rawTypeIcon;
+
+    const defaultKnownTypeIcon = DEFAULT_GRAPH_CONFIG?.nodeTypes?.[type]?.icon;
+    if (defaultKnownTypeIcon !== undefined && type !== "default") {
+      return defaultKnownTypeIcon;
+    }
+
+    const rawDefaultIcon = RAW_CONFIG?.nodeTypes?.default?.icon;
+    if (rawDefaultIcon !== undefined) return rawDefaultIcon;
+
+    return null;
+  }
+
   const textureLoader = new THREE.TextureLoader();
   const textureCache = new Map<string, THREE.Texture>();
 
@@ -1172,12 +1228,15 @@
   const R = GRAPH_CONFIG.node.ring;
   const ringGeometry = new THREE.RingGeometry(R.innerRadius, R.outerRadius, R.segments);
 
-  function makeIconSprite(node: any, size = 14, opacity = 1) {
-    const style = getNodeStyle(node);
-
+  function makeIconSprite(
+    node: any,
+    size = 14,
+    opacity = 1,
+    iconPath: string | null = getExplicitNodeIcon(node)
+  ) {
     const sprite = new THREE.Sprite(
       new THREE.SpriteMaterial({
-        map: getTexture(style.icon),
+        map: getTexture(iconPath),
         transparent: true,
         depthWrite: false,
         opacity,
@@ -1186,6 +1245,48 @@
 
     sprite.scale.set(size, size, 1);
     return sprite;
+  }
+
+  function makeFallbackNodeBall(node: any, opacity = 1) {
+    const group = new THREE.Group();
+    const color = new THREE.Color(getDeterministicFallbackColor(node));
+
+    const glow = new THREE.Mesh(
+      new THREE.SphereGeometry(4.1, 24, 24),
+      new THREE.MeshBasicMaterial({
+        color,
+        transparent: true,
+        opacity: Math.min(0.18, opacity * 0.18),
+        depthWrite: false
+      })
+    );
+
+    const core = new THREE.Mesh(
+      new THREE.SphereGeometry(2.65, 32, 32),
+      new THREE.MeshBasicMaterial({
+        color,
+        transparent: true,
+        opacity: Math.min(1, opacity)
+      })
+    );
+
+    const highlight = new THREE.Mesh(
+      new THREE.SphereGeometry(0.75, 16, 16),
+      new THREE.MeshBasicMaterial({
+        color: "#ffffff",
+        transparent: true,
+        opacity: Math.min(0.55, opacity * 0.55),
+        depthWrite: false
+      })
+    );
+
+    highlight.position.set(-0.85, 0.95, 1.9);
+
+    group.add(glow);
+    group.add(core);
+    group.add(highlight);
+
+    return group;
   }
 
   function makeRing(color: string, opacity = 1) {
@@ -1238,23 +1339,15 @@
     const group = new THREE.Group();
     const o = opacityForNode(node.id);
 
-    const style = getNodeStyle(node);
-    const tex = node.type === "logo" ? null : getTexture(style.icon);
+    const iconPath = getExplicitNodeIcon(node);
+    const tex = iconPath ? getTexture(iconPath) : null;
 
-    // 🔹 ICONA se disponibile
+    // 🔹 ICONA se disponibile/configurata
     if (tex) {
-      group.add(makeIconSprite(node, GRAPH_CONFIG.node.iconSize, o));
+      group.add(makeIconSprite(node, GRAPH_CONFIG.node.iconSize, o, iconPath));
     } else {
-      // 🔥 fallback stabile
-      const sphere = new THREE.Mesh(
-        new THREE.SphereGeometry(2.5, 16, 16),
-        new THREE.MeshBasicMaterial({
-          color: colorAccessor(node),
-          transparent: true,
-          opacity: o
-        })
-      );
-      group.add(sphere);
+      // 🔹 fallback visiva node-like: pallina 3D pulita, senza iniziali
+      group.add(makeFallbackNodeBall(node, o));
     }
 
     // 🔹 ring sempre
